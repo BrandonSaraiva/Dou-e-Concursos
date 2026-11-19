@@ -22,8 +22,8 @@ jobs:
       - name: Preparar Buildozer e o SDK Android
         run: |
           sudo apt-get update
-          sudo apt-get install -y autoconf automake build-essential cmake libffi-dev libltdl-dev libncurses-dev libssl-dev libtool pkg-config zip zlib1g-dev
-          python -m pip install 'buildozer==1.6.0' 'Cython==3.0.12' setuptools
+          sudo apt-get install -y autoconf automake build-essential libffi-dev libltdl-dev libncurses-dev libssl-dev libtool pkg-config zip zlib1g-dev
+          python -m pip install 'buildozer==1.6.0' 'Cython==0.29.37' setuptools
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           "$sdkmanager" --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
           sed -i "/^android.ndk =/a android.sdk_path = $ANDROID_HOME\nandroid.ndk_path = $ANDROID_HOME/ndk/28.2.13676358" buildozer.spec
