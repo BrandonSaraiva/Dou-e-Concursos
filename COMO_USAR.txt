@@ -1,0 +1,7 @@
+ARQUIVOS OCULTOS DO RADAR DOU
+
+Este ZIP inclui os arquivos que não aparecem no novo repositório.
+Para subir pelo GitHub na web, use Add file > Create new file.
+No nome, digite .github/workflows/build-windows.yml e cole o conteudo do arquivo correspondente deste ZIP.
+Repita para build-android.yml, test.yml e .gitignore.
+Confirme em Commit changes. Depois abra Actions > Criar executável Windows > Run workflow.
