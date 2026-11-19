@@ -29,6 +29,20 @@ def setup_android_home(for_service: bool = False) -> Path:
     return path
 
 
+def read_clipboard_text() -> str:
+    from jnius import autoclass
+
+    activity = autoclass("org.kivy.android.PythonActivity").mActivity
+    clipboard = activity.getSystemService("clipboard")
+    clip = clipboard.getPrimaryClip()
+    if clip is None or not clip.getItemCount():
+        return ""
+    value = clip.getItemAt(0).getText()
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else value.toString()
+
+
 def _atomic_json(path: Path, item: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp")

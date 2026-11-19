@@ -25,7 +25,7 @@ from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 
 from .android_runtime import (
-    SERVICE_CLASS, is_alive, is_enabled, request_check, set_enabled, setup_android_home,
+    SERVICE_CLASS, is_alive, is_enabled, read_clipboard_text, request_check, set_enabled, setup_android_home,
 )
 from .database import read_dashboard, read_contest_dashboard
 from .messages import friendly_timestamp
@@ -87,14 +87,11 @@ class RadarAndroid(App):
 
         body.add_widget(label("[b]01  Configuração[/b]", 39, WHITE, 19))
         body.add_widget(label("Nome ou expressão que o DOU deve acompanhar", 28, WHITE, 14))
-        self.monitored_name = self._input("Ex.: Maria da Silva")
-        body.add_widget(self.monitored_name)
+        self.monitored_name = self._add_input(body, "Ex.: Maria da Silva")
         body.add_widget(label("Seu ID numérico no Telegram", 28, WHITE, 14))
-        self.chat = self._input("Ex.: 123456789", numeric=True)
-        body.add_widget(self.chat)
+        self.chat = self._add_input(body, "Ex.: 123456789", numeric=True)
         body.add_widget(label("Token do bot fornecido pelo @BotFather", 28, WHITE, 14))
-        self.token = self._input("123456789:token_do_bot", secret=True)
-        body.add_widget(self.token)
+        self.token = self._add_input(body, "123456789:token_do_bot", secret=True)
         body.add_widget(button("Mostrar/ocultar token", self._toggle, height=37))
         body.add_widget(label("Intervalo entre consultas", 28, WHITE, 14))
         self.interval = Spinner(text="60 minutos", values=("15 minutos", "30 minutos", "60 minutos",
@@ -159,12 +156,35 @@ class RadarAndroid(App):
         Clock.schedule_interval(self._refresh, 2.0)
         return page
 
-    def _input(self, placeholder, numeric=False, secret=False):
-        return TextInput(hint_text=placeholder, multiline=False, password=secret,
-                         input_filter="int" if numeric else None,
-                         background_color=INPUT, foreground_color=WHITE, hint_text_color=SOFT,
-                         cursor_color=MINT, font_size=dp(16),
-                         size_hint_y=None, height=dp(48), padding=(dp(11), dp(11)))
+    def _add_input(self, body, placeholder, numeric=False, secret=False):
+        field = TextInput(hint_text=placeholder, multiline=False, password=secret,
+                          input_filter="int" if numeric else None,
+                          background_color=INPUT, foreground_color=WHITE, hint_text_color=SOFT,
+                          cursor_color=MINT, font_size=dp(16),
+                          padding=(dp(11), dp(11)))
+        paste = button("Colar token" if secret else "Colar", lambda: self._paste_into(field), height=48)
+        paste.size_hint_x = None
+        paste.width = dp(103 if secret else 68)
+        row = BoxLayout(spacing=dp(8), size_hint_y=None, height=dp(48))
+        row.add_widget(field)
+        row.add_widget(paste)
+        body.add_widget(row)
+        return field
+
+    def _paste_into(self, field):
+        try:
+            text = read_clipboard_text().strip()
+        except Exception:
+            self._set_state("Não foi possível ler a área de transferência.", error=True)
+            return
+        if not text:
+            self._set_state("Copie um texto antes de tocar em Colar.", error=True)
+            return
+        if field is self.chat and (not text.isascii() or not text.isdecimal()):
+            self._set_state("Copie somente o ID numérico do Telegram.", error=True)
+            return
+        field.text = " ".join(text.splitlines())
+        self._set_state("Texto colado.")
 
     def _set_state(self, text, error=False):
         self.state.text = text
