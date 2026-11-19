@@ -64,7 +64,7 @@ Cole o token apenas no Radar. Se ele for exposto, revogue-o no BotFather, gere o
 
 ### Comandos no Telegram
 
-Confira [exemplos ilustrados de respostas](DEMONSTRACAO.md) e o fluxo completo entre a consulta e o alerta.
+Veja [capturas reais das respostas no Telegram](DEMONSTRACAO.md) e o fluxo completo entre a consulta e o alerta.
 
 | Comando | O que faz |
 | --- | --- |

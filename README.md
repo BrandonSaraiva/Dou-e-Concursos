@@ -28,9 +28,9 @@ As fontes são a [pesquisa pública do DOU](https://www.in.gov.br/consulta/-/bus
 
 ## Veja as respostas no Telegram
 
-A [demonstração ilustrada](docs/DEMONSTRACAO.md) mostra a consulta de um nome no DOU, o menu de concursos e o que acontece entre a primeira consulta e o envio de uma novidade.
+A [demonstração com capturas reais](docs/DEMONSTRACAO.md) mostra o menu, o status, as publicações do DOU, as listas nacional e estadual e as consultas manuais.
 
-![Prévia ilustrada de uma resposta sobre a pesquisa no DOU e de um alerta de nova publicação](assets/telegram-dou-exemplo.png)
+<a href="docs/DEMONSTRACAO.md"><img src="assets/telegram-real/menu.png" width="420" alt="Menu real do Radar no Telegram, com o nome monitorado ocultado"></a>
 
 ## Por dentro do projeto
 
