@@ -1,8 +1,10 @@
 # Radar DOU no Android
 
-**[Baixar RadarDOU.apk](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.0/RadarDOU.apk)** · [Página da versão](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/tag/android-v1.2.0)
+**[Baixar RadarDOU.apk](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.1/RadarDOU.apk)** · [Página da versão](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/tag/android-v1.2.1)
 
 ## Baixe e instale
+
+Se o Radar DOU 1.2.0 estiver instalado, desinstale essa versão antes de instalar a 1.2.1. A assinatura do APK mudou. A desinstalação apaga os dados locais, então tenha em mãos os dados do seu bot para configurar o Radar novamente.
 
 1. Abra o link acima no celular e baixe **RadarDOU.apk**. O pacote é para Android 8.0 ou superior em aparelhos ARM64.
 2. Abra o APK em **Downloads**. Se o Android pedir autorização para instalar apps dessa origem, confirme que o arquivo veio deste GitHub antes de autorizar.

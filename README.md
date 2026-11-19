@@ -2,7 +2,7 @@
 
 Acompanhe um nome no Diário Oficial da União e concursos nacionais ou da sua UF. O Radar guarda o histórico no dispositivo e avisa pelo Telegram quando encontra novidades.
 
-**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · **[Baixar APK para Android](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.0/RadarDOU.apk)** · [Guia Windows](docs/GUIA_WINDOWS.md) · [Guia Android](ANDROID.md) · [Capturas do Telegram](https://github.com/BrandonSaraiva/Dou-e-Concursos/blob/main/docs/DEMONSTRACAO.md)
+**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · **[Baixar APK para Android](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.1/RadarDOU.apk)** · [Guia Windows](docs/GUIA_WINDOWS.md) · [Guia Android](ANDROID.md) · [Capturas do Telegram](https://github.com/BrandonSaraiva/Dou-e-Concursos/blob/main/docs/DEMONSTRACAO.md)
 
 ![Diagrama do download Windows pelo GitHub Releases e da versão de teste pelo GitHub Actions](assets/tutorial-download-windows.png)
 
