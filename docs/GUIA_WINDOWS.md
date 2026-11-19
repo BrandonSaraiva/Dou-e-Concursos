@@ -34,7 +34,7 @@ Os dois downloads incluem `SHA256SUMS.txt` e `SOURCE_COMMIT.txt`, disponíveis s
 3. Copie o token completo que o BotFather devolver, incluindo os dois-pontos. Guarde-o como senha.
 4. Abra o link para **o bot que você acabou de criar** e toque em **Iniciar**, ou envie `/start` nesse chat. É ali que você receberá os alertas.
 
-Cole o token apenas no Radar. Se ele for exposto, revogue-o no BotFather, copie o novo token e atualize a configuração.
+Cole o token apenas no Radar. Se ele for exposto, revogue-o no BotFather, gere outro com `/token` e atualize a configuração. [Documentação do Telegram](https://core.telegram.org/bots/features#generating-an-authentication-token)
 
 ## 3. Descubra seu ID numérico
 
@@ -59,9 +59,12 @@ Cole o token apenas no Radar. Se ele for exposto, revogue-o no BotFather, copie 
 - **Ver resultados.** Use `/status`, `/ultimas` ou `/concursos` no Telegram. Dentro de `/concursos`, escolha a lista nacional ou a da sua UF. Os links de concursos apontam para a matéria do portal. Confira o prazo e os requisitos no edital do órgão.
 - **Fechar a janela.** Clique no **X** para deixar o Radar na bandeja, perto do relógio. Se o ícone estiver oculto, clique na seta da bandeja. Use o menu do ícone para **Abrir Radar DOU** ou **Sair do Radar DOU**.
 - **Pausar.** Clique em **Desligar** para interromper o monitoramento com a janela aberta. Para encerrar o aplicativo, use **Sair do Radar DOU** na bandeja.
+- **Alterar os monitores.** Clique em **Desligar**, aguarde a parada, altere os campos, salve e ative o Radar de novo. Trocar o termo do DOU reinicia o histórico dessa busca. Trocar a UF mantém os registros das UFs consultadas.
 - **Iniciar ao entrar no Windows.** Marque **Iniciar monitoramento ao entrar no Windows** e clique em **Salvar configurações**. O monitoramento depende da sessão do Windows, da conexão e do computador ligado.
 
 ### Comandos no Telegram
+
+Confira [exemplos ilustrados de respostas](DEMONSTRACAO.md) e o fluxo completo entre a consulta e o alerta.
 
 | Comando | O que faz |
 | --- | --- |

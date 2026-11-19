@@ -2,7 +2,7 @@
 
 Acompanhe um nome no Diário Oficial da União e concursos nacionais ou da sua UF. O Radar guarda o histórico no dispositivo e avisa pelo Telegram quando encontra novidades.
 
-**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · **[Guia ilustrado](docs/GUIA_WINDOWS.md)** · [Android experimental](ANDROID.md) · [Desenvolvimento](docs/DESENVOLVIMENTO.md)
+**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · **[Guia ilustrado](docs/GUIA_WINDOWS.md)** · **[Demonstração](docs/DEMONSTRACAO.md)** · [Android experimental](ANDROID.md) · [Desenvolvimento](docs/DESENVOLVIMENTO.md)
 
 ![Diagrama do download Windows pelo GitHub Releases e da versão de teste pelo GitHub Actions](assets/tutorial-download-windows.png)
 
@@ -25,6 +25,12 @@ Se a primeira release ainda estiver em preparação, [baixe uma compilação de 
 A primeira consulta bem-sucedida de cada monitor ou região cria uma referência. Os avisos começam quando aparecem novidades. No Windows, o Radar pode continuar na bandeja após fechar a janela e iniciar ao entrar na sua conta.
 
 As fontes são a [pesquisa pública do DOU](https://www.in.gov.br/consulta/-/buscar/dou) e o portal editorial [Concursos no Brasil](https://concursosnobrasil.com/concursos/). O Radar é um projeto pessoal independente. Confira prazos e requisitos no edital do órgão. A disponibilidade do monitoramento depende da conexão, do dispositivo ativo e das fontes.
+
+## Veja as respostas no Telegram
+
+A [demonstração ilustrada](docs/DEMONSTRACAO.md) mostra a consulta de um nome no DOU, o menu de concursos e o que acontece entre a primeira consulta e o envio de uma novidade.
+
+![Prévia ilustrada de uma resposta sobre a pesquisa no DOU e de um alerta de nova publicação](assets/telegram-dou-exemplo.png)
 
 ## Por dentro do projeto
 

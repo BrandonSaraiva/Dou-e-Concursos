@@ -68,7 +68,7 @@ O hash deve coincidir, ignorando diferenças entre maiúsculas e minúsculas. O 
 | [`database.py`](../radar_dou/database.py) e [`settings.py`](../radar_dou/settings.py) | Histórico, filas, preferências e armazenamento de credenciais. |
 | [`android_ui.py`](../radar_dou/android_ui.py), [`android_runtime.py`](../radar_dou/android_runtime.py) e [`android_service.py`](../android_service.py) | Interface móvel, comunicação local e serviço em primeiro plano. |
 | [`tests/`](../tests), [`scripts/`](../scripts) e [`.github/workflows/`](../.github/workflows) | Testes do código, compilação e validação do pacote, automação de CI e publicação. |
-| [`assets/`](../assets) | Ilustrações do guia, regeneradas com `python assets/create_docs_images.py` em um ambiente com Pillow e Segoe UI ou DejaVu Sans. |
+| [`assets/`](../assets) | Ilustrações e geradores usados no guia de instalação e na demonstração. |
 
 ### Coleta e emissão de alertas
 
@@ -82,6 +82,15 @@ O hash deve coincidir, ignorando diferenças entre maiúsculas e minúsculas. O 
 No Windows, o Radar guarda os dados em `%APPDATA%\RadarDOU` e protege o token com DPAPI da conta logada. No Android, o token fica na pasta privada do app. As configurações permanecem no dispositivo. O nome monitorado integra a consulta ao DOU e o token é usado nas chamadas da API do Telegram.
 
 As preferências ficam em `config.json`, o histórico e as filas em `radar.sqlite3` e o registro de atividades em `radar.log`. Falhas de inicialização podem deixar `falha_inicializacao.txt`. Ao depurar, use dados fictícios e uma pasta isolada definida por `RADAR_DOU_HOME`. Antes de anexar diagnósticos a uma issue pública, remova dados pessoais e mantenha o token, a configuração e o banco fora do Git.
+
+## Gere as imagens da documentação
+
+Use o ambiente virtual com as dependências do projeto. O gerador de ilustrações usa Pillow e as fontes Segoe UI ou DejaVu Sans. O gerador das respostas do Telegram usa Edge no Windows ou Chromium do Playwright em outros sistemas. As respostas são geradas com fontes fictícias e com o Telegram simulado.
+
+```powershell
+.\.venv\Scripts\python.exe assets/create_docs_images.py
+.\.venv\Scripts\python.exe -m assets.create_telegram_previews
+```
 
 ## Android e referências
 
