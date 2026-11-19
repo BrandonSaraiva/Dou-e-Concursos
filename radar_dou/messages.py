@@ -6,8 +6,23 @@ import json
 BRT = timezone(timedelta(hours=-3))
 
 
-def safe(value) -> str:
-    return escape(str(value if value not in (None, "") else "Não informado"), quote=True)
+def safe(value, limit: int | None = None) -> str:
+    text = str(value if value not in (None, "") else "Não informado")
+    if limit is not None and len(text) > limit:
+        text = text[:limit - 1].rstrip() + "…"
+    return escape(text, quote=True)
+
+
+def message_lines(lines: list[str], limit: int = 3700) -> str:
+    """Limita o HTML sem cortar entidades escapadas, tags ou links ao meio."""
+    chunks = []
+    length = 0
+    for line in lines:
+        length += len(line) + 1
+        if length > limit:
+            break
+        chunks.append(line)
+    return "\n".join(chunks)
 
 
 def friendly_timestamp(value: str | None) -> str:
@@ -20,19 +35,21 @@ def friendly_timestamp(value: str | None) -> str:
 
 
 def publication_card(pub, number: int | None = None) -> str:
-    hierarchy = " › ".join(str(x) for x in json.loads(pub["hierarchy_json"] or "[]"))
-    snippet = str(pub["snippet"] or "Sem trecho disponível no resultado.")
-    if len(snippet) > 1100:
-        snippet = snippet[:1097].rstrip() + "…"
+    try:
+        hierarchy_items = json.loads(pub["hierarchy_json"] or "[]")
+    except (ValueError, TypeError):
+        hierarchy_items = []
+    hierarchy = " › ".join(map(str, hierarchy_items)) if isinstance(hierarchy_items, list) else ""
+    snippet = pub["snippet"] or "Sem trecho disponível no resultado."
     no = f" • {number}" if number else ""
     return (f"<b>📰 NOVA PUBLICAÇÃO NO DOU{no}</b>\n\n"
-            f"<b>{safe(pub['title'])}</b>\n\n"
-            f"📅 <b>Data:</b> {safe(pub['pub_date'])}\n"
-            f"🏛 <b>Órgão:</b> {safe(pub['organization'])}\n"
-            f"📑 <b>Local:</b> {safe(pub['section'])} · Edição {safe(pub['edition'])} · pág. {safe(pub['page'])}\n"
-            f"🏷 <b>Tipo:</b> {safe(pub['act_type'])}\n"
-            + (f"🔎 <b>Vinculação:</b> {safe(hierarchy)}\n" if hierarchy else "")
-            + f"\n<b>Trecho da busca</b>\n{safe(snippet)}\n\n"
+            f"<b>{safe(pub['title'], 240)}</b>\n\n"
+            f"📅 <b>Data:</b> {safe(pub['pub_date'], 30)}\n"
+            f"🏛 <b>Órgão:</b> {safe(pub['organization'], 160)}\n"
+            f"📑 <b>Local:</b> {safe(pub['section'], 100)} · Edição {safe(pub['edition'], 30)} · pág. {safe(pub['page'], 30)}\n"
+            f"🏷 <b>Tipo:</b> {safe(pub['act_type'], 100)}\n"
+            + (f"🔎 <b>Vinculação:</b> {safe(hierarchy, 180)}\n" if hierarchy else "")
+            + f"\n<b>Trecho da busca</b>\n{safe(snippet, 1100)}\n\n"
               f"🔗 <a href=\"{safe(pub['url'])}\">Abrir publicação original no DOU</a>")
 
 

@@ -9,11 +9,13 @@ from dataclasses import dataclass
 from hashlib import sha256
 from html import unescape
 import json
+import os
+from pathlib import Path
 import re
 import shutil
 import subprocess
 from typing import Callable
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, unquote, urljoin, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -22,6 +24,8 @@ from urllib3.util.retry import Retry
 
 BASE = "https://www.in.gov.br"
 SEARCH_ENDPOINT = BASE + "/consulta/-/buscar/dou"
+_PUBLICATION_PATH = "/web/dou/-/"
+_DOU_HOSTS = ("in.gov.br", "www.in.gov.br")
 
 
 class ScrapeError(RuntimeError):
@@ -69,10 +73,12 @@ def normalized_text(value: object) -> str:
 def _publication_from_json(hit: dict) -> Publication:
     if not isinstance(hit, dict):
         raise ScrapeError("A pesquisa trouxe um registro sem metadados")
-    slug = str(hit.get("urlTitle", "")).strip().lstrip("/")
-    if not slug or not hit.get("title"):
+    path = urlsplit(str(hit.get("urlTitle") or "").strip())
+    slug = unquote(path.path.removeprefix(_PUBLICATION_PATH).lstrip("/"))
+    if (not slug or not hit.get("title") or (path.hostname and path.hostname not in _DOU_HOSTS)
+            or any(part in ("", ".", "..") for part in slug.split("/"))):
         raise ScrapeError("Resultado sem título/URL, impedindo comparação segura")
-    url = BASE + "/web/dou/-/" + quote(slug, safe="/-")
+    url = BASE + _PUBLICATION_PATH + quote(slug, safe="/-")
     hierarchy = tuple(str(x).strip() for x in (hit.get("hierarchyList") or []) if str(x).strip())
     name = str(hit.get("pubName", "")).strip()
     section = {"DO1": "Seção 1", "DO2": "Seção 2", "DO3": "Seção 3"}.get(name, name)
@@ -118,11 +124,13 @@ def parse_search_html(html: str, search_url: str = SEARCH_ENDPOINT) -> Snapshot:
             info_el = box.select_one(".publication-info-marker")
             info = info_el.get_text(" ", strip=True) if info_el else ""
             numbers = re.search(r"Edição\s*N[º°o.]?\s*([\d]+)\s+de\s+([\d/]+)\s*-\s*Pág\.?\s*([\d]+)", info, re.I)
-            href = urljoin(BASE, anchor["href"])
+            href = urlsplit(urljoin(BASE, anchor["href"]))
+            if href.hostname not in _DOU_HOSTS or not href.path.startswith(_PUBLICATION_PATH):
+                raise ScrapeError("Resultado do DOU aponta para um endereço inesperado")
             section_el = box.select_one(".secao-marker")
             snippet_el = box.select_one(".abstract-marker")
             raw = {
-                "urlTitle": href.split("/web/dou/-/")[-1],
+                "urlTitle": href.path.removeprefix(_PUBLICATION_PATH),
                 "title": anchor.get_text(" ", strip=True),
                 "pubDate": numbers.group(2) if numbers else "",
                 "editionNumber": numbers.group(1) if numbers else "",
@@ -165,23 +173,31 @@ class DOUClient:
         try:
             response = self.session.get(SEARCH_ENDPOINT, params=params, timeout=self.timeout)
             response.raise_for_status()
-            if "text/html" not in response.headers.get("Content-Type", "text/html"):
+            if "text/html" not in response.headers.get("Content-Type", "").lower():
                 raise ScrapeError("O portal não devolveu uma página HTML")
             return parse_search_html(response.text, response.url)
         except requests.RequestException as exc:
             raise ScrapeError(f"Falha HTTP: {type(exc).__name__}") from exc
 
     def _get_curl(self, params: dict) -> Snapshot:
-        if not shutil.which("curl"):
+        if os.name == "nt":
+            system_curl = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "curl.exe"
+            executable = str(system_curl) if system_curl.is_file() else None
+        else:
+            executable = shutil.which("curl")
+        if not executable:
             raise ScrapeError("curl indisponível")
         url = requests.Request("GET", SEARCH_ENDPOINT, params=params).prepare().url
-        command = ["curl", "--silent", "--show-error", "--fail", "--location", "--compressed",
+        command = [executable, "--disable", "--silent", "--show-error", "--fail", "--location", "--compressed",
                    "--connect-timeout", "15", "--max-time", str(self.timeout), "--retry", "1",
                    "--header", "Accept-Language: pt-BR,pt;q=0.9",
-                   "--user-agent", self.session.headers["User-Agent"], url]
+                   "--user-agent", self.session.headers["User-Agent"], "--config", "-"]
         try:
+            # A expressão monitorada passa por stdin, sem ficar na linha de comando.
             result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
-                                    errors="replace", timeout=self.timeout + 15, check=False)
+                                    input=f'url = "{url}"\n',
+                                    errors="replace", timeout=self.timeout + 15, check=False,
+                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise ScrapeError(f"Falha no curl: {type(exc).__name__}") from exc
         if result.returncode != 0:
@@ -281,5 +297,6 @@ class DOUClient:
                 self.report("Consulta pelo navegador concluída e validada.")
                 return snapshot
             except Exception as exc:
-                errors.append(f"navegador: {type(exc).__name__}: {str(exc)[:170]}")
+                # O traceback do navegador pode incluir a URL com o nome pesquisado.
+                errors.append(f"navegador: {type(exc).__name__}")
         raise ScrapeError("Não foi possível validar a consulta. " + "; ".join(errors) + ". Histórico preservado.")

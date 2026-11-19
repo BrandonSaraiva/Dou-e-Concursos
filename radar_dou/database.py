@@ -8,6 +8,17 @@ import sqlite3
 from .scraper import Snapshot
 
 
+_VISIBLE_CONTESTS = """
+    FROM contest_entries e
+    WHERE e.telegram_id=? AND e.scope=? AND e.current=1
+      AND (e.scope='BR' OR NOT EXISTS (
+          SELECT 1 FROM contest_entries national
+          WHERE national.telegram_id=e.telegram_id AND national.scope='BR'
+            AND national.url=e.url AND national.current=1
+      ))
+"""
+
+
 def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -15,7 +26,7 @@ def now_utc() -> str:
 class Store:
     def __init__(self, path: str | Path):
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.conn = sqlite3.connect(self.path, timeout=30, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA busy_timeout=30000")
@@ -62,6 +73,10 @@ class Store:
         );
         CREATE INDEX IF NOT EXISTS ix_contests_current
           ON contest_entries(telegram_id, scope, current);
+        CREATE INDEX IF NOT EXISTS ix_contests_url
+          ON contest_entries(telegram_id, url);
+        CREATE INDEX IF NOT EXISTS ix_contest_notifications_url
+          ON contest_notifications(telegram_id, url);
         """)
         self.conn.commit()
 
@@ -163,15 +178,13 @@ class Store:
             if item.url in seen:
                 raise ValueError("URLs de concursos repetidas na consulta")
             seen.add(item.url)
-        old = self.conn.execute(
-            "SELECT seeded FROM contest_watches WHERE telegram_id=? AND scope=?",
-            (telegram_id, scope)).fetchone()
-        baseline = not (old and old["seeded"])
         added = 0
         stamp = now_utc()
         with self.conn:
             self.conn.execute("""INSERT OR IGNORE INTO contest_watches(telegram_id,scope)
                 VALUES(?,?)""", (telegram_id,scope))
+            watch = self.contest_status(telegram_id, scope)
+            baseline = not watch["seeded"]
             self.conn.execute("""UPDATE contest_entries SET current=0
                 WHERE telegram_id=? AND scope=?""", (telegram_id,scope))
             for item in snapshot.contests:
@@ -211,17 +224,12 @@ class Store:
                                  (telegram_id,scope)).fetchone()
 
     def contest_list(self, telegram_id: int, scope: str, *, limit: int = 5, offset: int = 0):
-        return self.conn.execute("""SELECT * FROM contest_entries
-            WHERE telegram_id=? AND scope=? AND current=1
-            ORDER BY organization COLLATE NOCASE, title COLLATE NOCASE
+        return self.conn.execute("SELECT e.* " + _VISIBLE_CONTESTS + """
+            ORDER BY organization COLLATE NOCASE, title COLLATE NOCASE, url
             LIMIT ? OFFSET ?""", (telegram_id,scope,limit,offset)).fetchall()
 
     def contest_counts(self, telegram_id: int, scope: str) -> tuple[int,int]:
-        total = self.conn.execute("""SELECT COUNT(*) FROM contest_entries
-            WHERE telegram_id=? AND scope=? AND current=1""", (telegram_id,scope)).fetchone()[0]
-        pending = self.conn.execute("""SELECT COUNT(*) FROM contest_notifications
-            WHERE telegram_id=? AND scope=? AND delivered_at IS NULL""", (telegram_id,scope)).fetchone()[0]
-        return total,pending
+        return _contest_counts(self.conn, telegram_id, scope)
 
     def pending_contests(self, telegram_id: int, limit: int = 70, scopes: tuple[str, ...] | None = None):
         # Não enviar alertas de uma UF anteriormente escolhida quando outra UF
@@ -232,36 +240,55 @@ class Store:
         if not allowed:
             return []
         placeholders = ",".join("?" for _ in allowed)
-        return self.conn.execute(f"""SELECT e.* FROM contest_notifications n
-            JOIN contest_entries e USING(telegram_id,scope,url)
-            WHERE n.telegram_id=? AND n.delivered_at IS NULL
-              AND n.scope IN ({placeholders})
-            ORDER BY n.created_at ASC LIMIT ?""", (telegram_id,*allowed,limit)).fetchall()
+        return self.conn.execute(f"""
+            WITH queued AS (
+                SELECT url, MIN(created_at) AS queued_at
+                FROM contest_notifications
+                WHERE telegram_id=?
+                GROUP BY url
+                HAVING COUNT(delivered_at)=0
+            ), eligible AS (
+                SELECT e.*, q.queued_at, ROW_NUMBER() OVER (
+                    PARTITION BY e.url ORDER BY e.scope <> 'BR', e.scope
+                ) AS preference
+                FROM contest_entries e JOIN queued q USING(url)
+                WHERE e.telegram_id=? AND e.current=1 AND e.scope IN ({placeholders})
+            )
+            SELECT * FROM eligible WHERE preference=1
+            ORDER BY queued_at, url LIMIT ?""", (telegram_id,telegram_id,*allowed,limit)).fetchall()
 
     def mark_contest_sent(self, telegram_id: int, scope: str, url: str):
         with self.conn:
             self.conn.execute("""UPDATE contest_notifications SET delivered_at=?,
                 attempts=attempts+1,last_error=NULL
-                WHERE telegram_id=? AND scope=? AND url=?""",
-                (now_utc(),telegram_id,scope,url))
+                WHERE telegram_id=? AND url=? AND delivered_at IS NULL""",
+                (now_utc(),telegram_id,url))
 
     def mark_contest_send_error(self, telegram_id: int, scope: str, url: str, detail: str):
         with self.conn:
             self.conn.execute("""UPDATE contest_notifications SET attempts=attempts+1,
-                last_error=? WHERE telegram_id=? AND scope=? AND url=?""",
-                (detail[:250],telegram_id,scope,url))
+                last_error=? WHERE telegram_id=? AND url=? AND delivered_at IS NULL""",
+                (detail[:250],telegram_id,url))
 
     def close(self):
         self.conn.close()
 
 
+def _contest_counts(conn: sqlite3.Connection, telegram_id: int, scope: str) -> tuple[int, int]:
+    return tuple(conn.execute("""SELECT COUNT(*), COALESCE(SUM(
+        EXISTS (SELECT 1 FROM contest_notifications n
+                WHERE n.telegram_id=e.telegram_id AND n.url=e.url AND n.delivered_at IS NULL)
+        AND NOT EXISTS (SELECT 1 FROM contest_notifications n
+                WHERE n.telegram_id=e.telegram_id AND n.url=e.url AND n.delivered_at IS NOT NULL)
+        ), 0) """ + _VISIBLE_CONTESTS, (telegram_id, scope)).fetchone())
+
+
 def read_dashboard(database_path: Path, telegram_id: int) -> dict:
     """Leitura de outra conexão para o thread da GUI, sem compartilhar cursors."""
-    if not database_path.exists():
-        return {}
-    db = sqlite3.connect(database_path, timeout=2)
-    db.row_factory = sqlite3.Row
+    db = None
     try:
+        db = sqlite3.connect(database_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+        db.row_factory = sqlite3.Row
         row = db.execute("SELECT * FROM watches WHERE telegram_id=?", (telegram_id,)).fetchone()
         if not row:
             return {}
@@ -270,30 +297,27 @@ def read_dashboard(database_path: Path, telegram_id: int) -> dict:
         result["pending"] = db.execute("""SELECT COUNT(*) FROM notifications WHERE watch_id=?
                      AND delivered_at IS NULL""", (row["id"],)).fetchone()[0]
         return result
-    except sqlite3.Error:
+    except (sqlite3.Error, OSError):
         return {}
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 def read_contest_dashboard(database_path: Path, telegram_id: int) -> dict:
     """Resumo independente do DOU; seguro para leitura em outra thread/processo."""
-    if not database_path.exists():
-        return {}
-    conn = sqlite3.connect(database_path, timeout=2)
-    conn.row_factory = sqlite3.Row
+    conn = None
     try:
+        conn = sqlite3.connect(database_path.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
+        conn.row_factory = sqlite3.Row
         scopes = {}
         for item in conn.execute("SELECT * FROM contest_watches WHERE telegram_id=?", (telegram_id,)):
             scope = item["scope"]
-            current = conn.execute("""SELECT COUNT(*) FROM contest_entries WHERE telegram_id=?
-                AND scope=? AND current=1""",(telegram_id,scope)).fetchone()[0]
-            pending = conn.execute("""SELECT COUNT(*) FROM contest_notifications
-                WHERE telegram_id=? AND scope=? AND delivered_at IS NULL""",
-                (telegram_id,scope)).fetchone()[0]
+            current, pending = _contest_counts(conn, telegram_id, scope)
             scopes[scope] = {**dict(item), "current": current, "pending": pending}
         return scopes
-    except sqlite3.Error:
+    except (sqlite3.Error, OSError):
         return {}
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()

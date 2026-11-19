@@ -260,8 +260,8 @@ class RadarAndroid(App):
                 from .service import test_credentials
                 result = test_credentials(config)
                 Clock.schedule_once(lambda dt, value=result: self._set_state("✓ " + value[:105]))
-            except Exception as exc:
-                message = str(exc)[:120]
+            except Exception:
+                message = "Falha no Telegram. Confira sua conexão, o token e se enviou /start ao bot."
                 Clock.schedule_once(lambda dt, value=message: self._set_state("⚠ " + value, error=True))
             finally:
                 Clock.schedule_once(lambda dt: setattr(self, "_testing", False))

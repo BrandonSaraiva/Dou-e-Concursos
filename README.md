@@ -24,7 +24,7 @@ O aplicativo consulta duas fontes independentes: a [pesquisa pública do Diário
 
 Você pode **ativar só o DOU, só os concursos ou os dois**. Quando os concursos estão ativos, a busca nacional é automática; você também pode escolher uma UF (ex.: `DF`, `GO`, `SP`) ou deixar **Somente nacional**.
 
-- **Windows:** aplicativo gráfico com nome, ID do Telegram, token, botões e logs. Depois de gerado, basta executar `RadarDOU.exe`.
+- **Windows:** aplicativo gráfico que mantém o monitoramento ativo na bandeja. Para usar, basta executar `RadarDOU.exe`.
 - **Android:** aplicativo gráfico com os mesmos campos e um **serviço em primeiro plano** que pode continuar ativo mesmo quando você fecha a tela e abre o Telegram.
 - **Histórico persistente:** banco SQLite local, inclusive depois de reiniciar. Cada pesquisa cria sua própria referência inicial sem alertas antigos.
 - **Monitoramento do DOU:** intervalo configurável de 15 a 1.440 minutos (padrão: 60).
@@ -98,6 +98,7 @@ Você fará **três coisas**: criar um bot no Telegram, descobrir seu ID numéri
 | **UF** | `Somente nacional` ou uma das 27 UFs; exemplo `DF`. A sigla fica salva. |
 | **Intervalo** | Frequência de busca **do DOU**; concursos são conferidos de hora em hora. |
 | **Salvar configurações** | Mantém os dados localmente após fechar e abrir de novo. |
+| **Iniciar monitoramento ao entrar no Windows** | Abre o Radar na bandeja e ativa o monitoramento ao entrar na conta do Windows. |
 | **Testar conexão** | Valida o token e tenta entregar uma mensagem ao seu chat. |
 | **Ativar radar** | Liga o monitoramento e faz uma verificação inicial. |
 | **Desligar** | Solicita parada segura, sem apagar o histórico. |
@@ -109,24 +110,22 @@ Você fará **três coisas**: criar um bot no Telegram, descobrir seu ID numéri
 
 ## 🖥️ Windows: como baixar e usar o executável
 
-O código do repositório inclui uma rotina de compilação do arquivo `RadarDOU.exe` pelo **GitHub Actions**. Os usuários finais **não precisam instalar Python** para executar o EXE já compilado. O **ZIP do código-fonte não inclui um `.exe` previamente compilado**: a automação gera um Windows `.exe` real, testa sua inicialização e, se estiver tudo certo, **adiciona automaticamente o executável em `downloads/RadarDOU.exe` no próprio repositório**. A automação também oferece o binário em `Actions > Artifacts`.
+1. Abra a [versão mais recente em GitHub Releases](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest).
+2. Na seção **Assets**, clique em **RadarDOU.exe**.
+3. Na pasta **Downloads**, dê dois cliques em **RadarDOU.exe**. Use Windows 10 ou 11 de 64 bits. O executável inclui Python e as dependências do aplicativo.
+4. Siga os passos anteriores para preencher os campos, testar a conexão com seu bot e clicar em **Ativar radar**.
 
-> A compilação ocorre em Windows 10/11 x64 compatível, sem precisar instalar Python no computador de quem usar o executável. Se você tiver modificado o código, **espere a compilação automática terminar** antes de distribuir o novo arquivo.
+O botão **X** fecha a janela e mantém o Radar ativo na **bandeja do Windows**, perto do relógio. Use a seta **Mostrar ícones ocultos** se necessário. Clique com o botão direito no ícone do Radar para **Abrir Radar DOU** ou **Sair do Radar DOU**. **Desligar** na janela interrompe o monitoramento.
 
-![Como gerar o EXE pelo GitHub](assets/tutorial-github-actions.png)
+Para o Radar voltar a monitorar depois de reiniciar o PC, marque **Iniciar monitoramento ao entrar no Windows** e clique em **Salvar configurações**. O monitoramento precisa de computador ligado, sessão do Windows ativa e conexão com a internet.
 
-1. No GitHub, abra seu repositório depois de publicar os arquivos deste projeto.
-2. Entre na aba **Actions**.
-3. À esquerda, selecione **Criar executável Windows**.
-4. Clique em **Run workflow** e confirme. Se o GitHub pedir autorização para executar workflows, permita para este repositório.
-5. Quando o workflow terminar com êxito, abra sua execução e localize **Artifacts**.
-6. Baixe o artefato **RadarDOU-Windows-[commit]**, extraia-o e execute `RadarDOU.exe`. Alternativamente, **espere o commit automático do Actions e baixe `downloads/RadarDOU.exe` diretamente pelo repositório**.
-7. No primeiro uso, o Windows pode apresentar um aviso por ser um executável sem assinatura digital. Só execute se você confia no código que está compilando; leia os arquivos do projeto antes de aceitar.
-8. Preencha os campos, teste a conexão e clique em **Ativar radar**.
+### Atualizar o Radar
 
-**Para continuar monitorando:** deixe o aplicativo aberto e o computador ligado, com internet. Fechar a janela desliga o serviço Windows. Na próxima abertura, as configurações e o banco continuam presentes.
+1. Na bandeja do Windows, escolha **Sair do Radar DOU**.
+2. Baixe o novo **RadarDOU.exe** em [Releases](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest) e substitua o executável antigo.
+3. Abra a nova versão na mesma conta do Windows. As configurações e o histórico continuam em `%APPDATA%\RadarDOU`. Se você mudou o caminho do executável, clique em **Salvar configurações** para atualizar a entrada de inicialização automática.
 
-**Alternativa para desenvolvedores:** com Python 3.11+ instalado, use `rodar_com_python.bat` ou `GERAR_EXE_WINDOWS.bat` para executar/compilar localmente. Esses atalhos não são necessários para quem baixa o `.exe` pronto.
+Cada versão inclui `SHA256SUMS.txt` para conferir a integridade do download e `SOURCE_COMMIT.txt` com o commit usado na compilação.
 
 ## 📱 Android: como gerar, instalar e usar o APK
 
@@ -156,22 +155,6 @@ As palavras dos menus variam de fabricante para fabricante, mas normalmente o ca
 **Limitações reais do Android:** o serviço depende de o celular permanecer ligado e conectado à internet. Android e fabricantes podem interromper processos para economizar bateria, especialmente sob restrições agressivas. O serviço `foreground` com reinício solicitado ao sistema reduz interrupções, mas **não garante funcionamento 24 horas por dia**. O APK **não reinicia automaticamente ao ligar o telefone**; reabra e ative o radar se reiniciar o aparelho. Desinstalar o aplicativo remove seu banco e suas configurações. Também não há integração com o navegador Playwright no APK: a consulta móvel usa requisições HTTP. Se o site do DOU bloquear esse tipo de acesso, os logs mostrarão o erro e o histórico será preservado.
 
 > **Estado da compilação:** o repositório contém o **código e o workflow de compilação Android**. O projeto precisa passar pelo Buildozer/Android SDK e por teste em dispositivo físico; um APK compilado e funcional **não foi validado** nesta entrega. Se o workflow falhar, os logs do GitHub Actions mostrarão o erro de compilação. Serviços Android e regras de distribuição pela Google Play exigem revisão adicional antes de publicar numa loja.
-
-## 📦 Publicar este ZIP em outra conta GitHub
-
-**Atenção: não envie o ZIP inteiro como se fosse um arquivo do projeto.** O conteúdo deve ser descompactado primeiro.
-
-1. Entre na outra conta em [github.com](https://github.com/) e clique em **+ → New repository**.
-2. Escolha um nome, por exemplo `radar-dou`, e marque **Public**. Na criação, deixe desmarcada a opção de criar README, pois o ZIP já tem um `README.md` completo.
-3. Crie o repositório.
-4. Extraia o ZIP do Radar DOU em uma pasta no seu computador.
-5. Na página inicial do repositório vazio, escolha **uploading an existing file** (ou **Add file → Upload files**).
-6. Arraste **o conteúdo extraído** para o GitHub, incluindo a pasta `.github` com os workflows, a pasta `radar_dou`, a pasta `assets`, o `buildozer.spec` e o `README.md`.
-7. Clique em **Commit changes**. O README aparecerá automaticamente na página principal.
-8. A automação **Criar executável Windows** é acionada no primeiro envio do código à branch `main`/`master`. Aguarde o resultado na aba **Actions**. Se o workflow passar, o GitHub adiciona `downloads/RadarDOU.exe`, `downloads/SOURCE_COMMIT.txt` e o SHA-256 ao próprio repositório automaticamente. Se o arquivo ainda não apareceu, confira se Actions está habilitado e se o job concluiu sem erros.
-9. O APK é gerado separadamente no workflow **Criar APK Android**. Não é entregue pré-compilado e precisa de teste real em aparelho.
-
-**Nunca publique seu token pessoal.** Este ZIP inclui apenas código e ilustrações fictícias. O token só deve ser digitado no aplicativo instalado.
 
 ## 🤖 Comandos disponíveis no Telegram
 
@@ -234,19 +217,6 @@ Arquivos importantes: `config.json`, `radar.sqlite3`, `radar.log` e, em caso de 
 - O site de concursos é um **portal jornalístico privado**. A posição na página de “abertos” não confirma que a inscrição ainda aceita candidaturas, nem garante dados completos. Confira o edital e o site do órgão organizador.
 - Não é um serviço oficial, nem afiliado ao DOU, ao Telegram ou ao Concursos no Brasil. Use os acessos com moderação e respeite os termos de uso e o `robots.txt` de cada fonte. Mudanças de layout ou bloqueio podem exigir manutenção.
 
-## 🔧 Corrigindo o erro “Tabela de concursos abertos ausente” (novembro de 2026)
-
-As categorias `.../concursos/br/` e `.../concursos/df/` podem apresentar links em elementos que não são `<table>` com `a.post-title`, que era uma hipótese rígida do coletor anterior. A atualização usa o título **Concursos Públicos Abertos** como delimitador, lê links elegíveis em tabelas/listas/cards e para antes da seção **Previstos**. Quando não consegue validar o HTML, mantém o último catálogo íntegro no SQLite e registra erro visível nos logs. No Windows, uma falha HTTP/HTML aciona uma tentativa alternativa com navegador em modo oculto, se houver Edge, Chrome ou Chromium disponível; no Android, essa tentativa não existe.
-
-**Para atualizar apenas o coletor, sem apagar sua configuração:**
-
-1. Feche o Radar pelo botão **Desligar** e feche a janela.
-2. Extraia o pacote de correção na pasta do projeto, substituindo somente `radar_dou/concursos.py` (a pasta `radar_dou` já existe ao lado de `main.py`).
-3. Execute novamente `rodar_com_python.bat` ou compile um novo `RadarDOU.exe` com `GERAR_EXE_WINDOWS.bat` / Actions. **O EXE já compilado não muda quando você edita o `.py`**.
-4. Ative o Radar e envie `/conferirconcursos` ao bot. Nos logs, procure `HTTP 200` e `Concursos DF: ... abertos reconhecidos` ou a explicação da falha.
-
-Se ainda falhar, encaminhe somente as linhas `CONCURSOS BR` e `CONCURSOS UF` dos logs, removendo qualquer informação privada antes de compartilhar. Para validar a continuidade de monitoramento, mantenha a máquina ligada e o aplicativo ativo. Esta correção tem testes automatizados locais, mas **não foi confirmada por teste HTTP direto contra o site** neste ambiente de entrega.
-
 ## 🛟 Perguntas frequentes
 
 **Salvei, mas o Telegram não recebeu a mensagem de teste.** Confirme que usou seu ID numérico, e não o número do bot. Reabra o bot que você criou e toque em **Iniciar**. Confirme o token recebido pelo BotFather, incluindo `:`. Se o bot estiver sendo executado em outro aparelho ao mesmo tempo, poderá haver conflito no recebimento de comandos.
@@ -267,19 +237,21 @@ Se ainda falhar, encaminhe somente as linhas `CONCURSOS BR` e `CONCURSOS UF` dos
 
 **Posso monitorar mais de um nome?** Cada instalação foi projetada para um nome por vez. Para vários nomes simultâneos, seria necessário ampliar o cadastro e o agendamento com múltiplas pesquisas.
 
-**E se o aplicativo fechar?** No Windows, o bot é encerrado. No Android, o serviço separado pode continuar (sujeito à política de bateria do sistema). Depois de uma reinicialização do telefone, ative novamente pelo aplicativo.
+**E se eu fechar a janela?** No Windows, o Radar fica na bandeja e continua monitorando. No Android, o serviço separado pode continuar enquanto o sistema mantiver o aplicativo ativo. Depois de reiniciar o telefone, ative o serviço pelo aplicativo.
+
+**O Radar fechou sozinho antes de abrir a janela.** No Windows, pressione **Win + R**, digite `%APPDATA%\RadarDOU` e procure `falha_inicializacao.txt`. Antes de compartilhar um diagnóstico, confira se o texto revela algum dado pessoal.
 
 ## 🧑‍💻 Testes e desenvolvimento
 
 ```bash
-python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Build local para Windows, com dependências instaladas (ou dê dois cliques em `GERAR_EXE_WINDOWS.bat`):
+Para executar o código-fonte no Windows, use `rodar_com_python.bat`. Para compilar com Python 3.12 x64 e as dependências de desenvolvimento instaladas, use `GERAR_EXE_WINDOWS.bat` ou o comando abaixo. O resultado fica em `dist/RadarDOU.exe`.
 
 ```powershell
-python -m PyInstaller --noconfirm --clean --onefile --windowed --name RadarDOU --collect-all telegram --collect-all apscheduler --collect-all playwright --collect-all certifi main.py
+./scripts/build-windows.ps1
 ```
 
 Build Android (Linux/WSL com SDK/NDK por conta do Buildozer):
@@ -289,9 +261,9 @@ python -m pip install buildozer
 buildozer android debug
 ```
 
-O executável contém o interpretador Python e dependências empacotados; por isso **o usuário final não instala Python**. A criação do EXE precisa ocorrer no Windows (localmente ou pelo workflow GitHub). Esta entrega foi validada com testes locais de código, **mas o EXE real não pôde ser compilado neste ambiente Linux**. Ele será gerado no runner Windows do GitHub após a publicação do repositório.
+O workflow **Compilar RadarDOU para Windows** roda os testes e empacota o executável nos Pull Requests para `main` e nas atualizações dessa branch. Os testes do binário abrem a interface e releem uma configuração fictícia protegida por DPAPI e o histórico SQLite em processos separados. O artefato validado aparece em **Actions → Artifacts**. A versão da `main` também é publicada em **Releases**.
 
-Para usuários comuns, recomendamos baixar o EXE da pasta `downloads/` após o build bem-sucedido. O projeto publica o código sob licença [MIT](LICENSE).
+Para gerar uma versão manualmente, abra **Actions → Compilar RadarDOU para Windows → Run workflow**, escolha `main` e confirme. O projeto publica o código sob licença [MIT](LICENSE).
 
 ### Referências técnicas
 
@@ -304,10 +276,3 @@ Para usuários comuns, recomendamos baixar o EXE da pasta `downloads/` após o b
 - [Serviços do python-for-android](https://python-for-android.readthedocs.io/en/latest/services/)
 - [Buildozer oficial](https://github.com/kivy/buildozer)
 - [Documentação do Android sobre serviços em primeiro plano](https://developer.android.com/develop/background-work/services/fgs/declare)
-
-### O programa abre uma tela preta e fecha sozinho?
-
-Use **`INICIAR_SEM_FECHAR.bat`** na pasta onde está `main.py` (extraia todo o ZIP antes).
-Esse inicializador abre o PowerShell com `-NoExit`, verifica Python/Tkinter e as bibliotecas, tenta abrir a interface e registra o resultado em `diagnostico_inicio.txt`. Assim, mesmo que a janela gráfica falhe, será possível identificar a causa.
-
-**Importante:** `diagnostico_inicio.txt` é privado e está no `.gitignore`. Antes de enviar o arquivo a terceiros, confirme se não contém o token do seu bot ou informações pessoais do computador. A versão compilada não depende de Python instalado; este diagnóstico se aplica à execução pelo código-fonte.

@@ -1,4 +1,4 @@
-from radar_dou.database import Store, read_dashboard
+from radar_dou.database import Store, read_contest_dashboard, read_dashboard
 from radar_dou.scraper import parse_search_html
 from tests.test_scraper import HTML
 
@@ -57,3 +57,11 @@ def test_error_does_not_erase_previous_success(tmp_path):
     assert s.watch(1111)["result_total"] == 2
     assert s.counts(watch["id"]) == (2, 0)
     s.close()
+
+
+def test_dashboard_does_not_create_missing_database_or_crash_on_directory(tmp_path):
+    missing = tmp_path / "absent.sqlite"
+    for browser in (read_dashboard, read_contest_dashboard):
+        assert browser(missing, 123) == {}
+        assert not missing.exists()
+        assert browser(tmp_path, 123) == {}

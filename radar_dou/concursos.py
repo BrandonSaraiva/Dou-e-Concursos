@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from html import unescape
 import logging
 import re
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qs, urljoin, urlsplit, urlunsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -227,11 +227,13 @@ def parse_concursos_html(html: str, scope: str, *, page_url: str = "") -> Concur
             raise ConcursoError(f"O portal retornou a UF errada (esperado: {name})")
     _, anchors = _open_section(main)
     items: dict[str, Concurso] = {}
+    forecasts = 0
     for anchor in anchors:
-        if not _relevant_article_link(anchor) or _forecast_ancestor(anchor, main):
+        if not _relevant_article_link(anchor):
             continue
         row = _row_for_anchor(anchor, main)
-        if _is_forecast(row):
+        if _forecast_ancestor(anchor, main) or _is_forecast(row):
+            forecasts += 1
             continue
         organization = _clean(anchor.get_text(" ", strip=True))
         title_text = _clean(anchor.get("title") or organization)
@@ -239,7 +241,7 @@ def parse_concursos_html(html: str, scope: str, *, page_url: str = "") -> Concur
         vacancies = _vacancies(anchor, row)
         if url not in items:
             items[url] = Concurso(organization, vacancies, title_text, url)
-    if not items:
+    if not items and not forecasts:
         content = _clean(main.get_text(" ", strip=True)).casefold()
         if "nenhum concurso aberto" not in content and "não há concursos abertos" not in content:
             raise ConcursoError(
@@ -278,11 +280,15 @@ class ConcursoClient:
             return None
         candidate = urljoin(page_url, next_tag["href"])
         target = urlsplit(candidate)
-        if (target.scheme == "https" and
-            target.hostname in ("concursosnobrasil.com", "www.concursosnobrasil.com") and
-            target.path.startswith(urlsplit(first_url).path + "page/")):
+        category_path = urlsplit(first_url).path
+        page_path = re.fullmatch(re.escape(category_path) + r"page/[1-9]\d*/?", target.path)
+        page_number = parse_qs(target.query).get("paged", [""])[0]
+        query_page = target.path == category_path and re.fullmatch(r"[1-9]\d*", page_number)
+        if (target.scheme == "https"
+                and target.hostname in ("concursosnobrasil.com", "www.concursosnobrasil.com")
+                and (page_path or query_page)):
             return candidate
-        return None
+        raise ConcursoError("Link de paginação inesperado; listagem anterior preservada")
 
     def _fetch_http(self, scope: str) -> ConcursoSnapshot:
         scope = scope.upper()

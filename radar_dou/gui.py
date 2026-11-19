@@ -2,10 +2,13 @@
 from __future__ import annotations
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+from contextlib import nullcontext
+import os
 import queue
 import re
+import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import messagebox, ttk
 import webbrowser
@@ -38,7 +41,7 @@ class SafeLogFormatter(logging.Formatter):
         token = self.token_getter()
         if token:
             result = result.replace(token, "[TOKEN_OCULTO]")
-        return re.sub(r"bot\d{5,}:[A-Za-z0-9_-]{20,}", "bot[TOKEN_OCULTO]", result)
+        return re.sub(r"\d{5,}:[A-Za-z0-9_-]{20,}", "[TOKEN_OCULTO]", result)
 
 
 class UIQueueHandler(logging.Handler):
@@ -54,8 +57,10 @@ class UIQueueHandler(logging.Handler):
 
 
 class RadarApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, *, instance=None, background=False, smoke=False):
         super().__init__()
+        if background:
+            self.withdraw()
         self.title("Radar DOU + Concursos  •  Central de alertas")
         self.geometry("1160x830")
         self.minsize(1000, 720)
@@ -64,12 +69,20 @@ class RadarApp(tk.Tk):
         self._events = queue.Queue()
         self._closing = False
         self._last_running = False
+        self._last_busy = False
+        self._stop_requested = False
+        self._instance = instance
+        self._tray = None
+        self._tray_ready = False
+        self._logged_token = ""
+        self._smoke = smoke
+        self.smoke_result = 0
         self._ticks = 0
         self.name_var = tk.StringVar()
         self.chat_var = tk.StringVar()
         self.token_var = tk.StringVar()
         self.interval_var = tk.StringVar(value="60")
-        self.show_token_var = tk.BooleanVar(value=False)
+        self.start_with_windows_var = tk.BooleanVar(value=False)
         self.dou_enabled_var = tk.BooleanVar(value=True)
         self.contests_enabled_var = tk.BooleanVar(value=True)
         self.uf_var = tk.StringVar(value="Somente nacional")
@@ -88,18 +101,33 @@ class RadarApp(tk.Tk):
                    foreground=[("readonly", TEXT)])
         self._build()
         self._setup_logging()
-        self._load_persisted()
+        config = self._load_persisted()
         self._load_previous_logs()
+        if background and (not config or not config.start_with_windows):
+            self.destroy()
+            return
+        if self._instance is not None:
+            try:
+                from .windows import WindowsTray
+                self._tray = WindowsTray(lambda event: self._events.put((event, "", logging.INFO)))
+            except Exception as exc:
+                if smoke:
+                    raise
+                self.log.warning("Bandeja indisponível (%s).", type(exc).__name__)
+                self._restore_window()
+        if background:
+            self._start_monitor(config)
         self.after(150, self._pump)
         self.protocol("WM_DELETE_WINDOW", self._close)
 
     def _setup_logging(self):
         folder = data_dir()
-        folder.mkdir(parents=True, exist_ok=True)
+        folder.mkdir(mode=0o700, parents=True, exist_ok=True)
         logger = logging.getLogger("radar_dou")
         logger.setLevel(logging.INFO)
         logger.propagate = False
-        formatter = SafeLogFormatter(lambda: self.token_var.get())
+        # Os handlers também rodam na thread do serviço. Não consultam Tkinter.
+        formatter = SafeLogFormatter(lambda: self._logged_token)
         for handler in list(logger.handlers):
             logger.removeHandler(handler)
             handler.close()
@@ -228,6 +256,12 @@ class RadarApp(tk.Tk):
                  "Para receber também seu estado, escolha a sigla (ex.: DF).",
                  bg=PANEL, fg=MUTED, font=("Segoe UI", 9), justify="left",
                  wraplength=330).pack(anchor="w", pady=(2,7))
+        if self._instance is not None:
+            tk.Checkbutton(parent, text="Iniciar monitoramento ao entrar no Windows",
+                           variable=self.start_with_windows_var, bg=PANEL, fg=TEXT,
+                           activebackground=PANEL, activeforeground=CYAN,
+                           selectcolor=BG, font=("Segoe UI", 10),
+                           wraplength=310, justify="left").pack(anchor="w")
         links = tk.Frame(parent, bg=PANEL)
         links.pack(fill="x", pady=2)
         self._button(links, "Criar bot ↗", lambda: webbrowser.open("https://t.me/BotFather")).pack(side="left", padx=(0, 7))
@@ -271,6 +305,10 @@ class RadarApp(tk.Tk):
         self.check_btn.pack(side="left", padx=(5, 0))
         self.stop_btn.configure(state="disabled")
         self.check_btn.configure(state="disabled")
+        if self._instance is not None:
+            tk.Label(parent, text="Fechar a janela mantém o Radar na bandeja. Use o ícone para sair.",
+                     bg=PANEL, fg=MUTED, font=("Segoe UI", 9),
+                     wraplength=470, justify="left").pack(anchor="w")
         console_title = tk.Frame(parent, bg=PANEL)
         console_title.pack(fill="x", pady=(5, 8))
         tk.Label(console_title, text="REGISTRO DE ATIVIDADES", bg=PANEL, fg=TEXT,
@@ -301,18 +339,21 @@ class RadarApp(tk.Tk):
             self.log.error("Configuração local inválida: %s", exc)
             return
         if config:
+            self._logged_token = config.token
             self.name_var.set(config.name)
             self.chat_var.set(str(config.telegram_id))
             self.token_var.set(config.token)
             self.interval_var.set(str(config.interval_minutes))
             self.dou_enabled_var.set(config.monitor_dou)
             self.contests_enabled_var.set(config.monitor_concursos)
+            self.start_with_windows_var.set(config.start_with_windows)
             self.uf_var.set(config.uf if config.uf else "Somente nacional")
             self.state_var.set("Configuração recuperada")
-            self.log.info("Configurações anteriores carregadas. O token não foi exposto nos logs.")
+            self.log.info("Configurações anteriores carregadas.")
         else:
             self.log.info("Bem-vindo! Preencha os campos à esquerda para iniciar.")
         self._refresh_dashboard()
+        return config
 
     def _load_previous_logs(self):
         path = log_file()
@@ -326,13 +367,22 @@ class RadarApp(tk.Tk):
 
     def _values(self):
         try:
+            telegram_id = int(self.chat_var.get().strip())
+            interval = int(self.interval_var.get())
+        except ValueError:
+            messagebox.showerror("Verifique os dados",
+                                 "Informe o ID do Telegram e o intervalo em números inteiros.",
+                                 parent=self)
+            return None
+        try:
             uf = self.uf_var.get().strip().upper()
             if uf == "SOMENTE NACIONAL":
                 uf = ""
-            return AppConfig(self.name_var.get(), int(self.chat_var.get().strip()),
-                             self.token_var.get().strip(), int(self.interval_var.get()),
+            return AppConfig(self.name_var.get(), telegram_id,
+                             self.token_var.get().strip(), interval,
                              uf=uf, monitor_dou=self.dou_enabled_var.get(),
-                             monitor_concursos=self.contests_enabled_var.get()).validated()
+                             monitor_concursos=self.contests_enabled_var.get(),
+                             start_with_windows=self.start_with_windows_var.get()).validated()
         except ValueError as exc:
             messagebox.showerror("Verifique os dados", str(exc), parent=self)
             return None
@@ -341,34 +391,50 @@ class RadarApp(tk.Tk):
         if self._service and self._service.busy:
             messagebox.showinfo("Monitoramento em andamento",
                                 "Desligue o radar antes de modificar as configurações.", parent=self)
-            return False
+            return None
         config = self._values()
         if not config:
-            return False
+            return None
         try:
-            path = save_settings(config)
-        except (OSError, ValueError) as exc:
-            messagebox.showerror("Falha ao salvar", str(exc), parent=self)
-            return False
+            save_settings(config)
+        except (OSError, ValueError):
+            messagebox.showerror("Falha ao salvar",
+                                 "Confira se a pasta de dados do Radar aceita gravação.",
+                                 parent=self)
+            return None
+        self._logged_token = config.token
         self.state_var.set("Configuração salva")
-        self.log.info("Configuração salva localmente em %s (token não exibido).", path.parent)
+        self.log.info("Configuração salva localmente.")
+        if self._instance is not None:
+            from .windows import set_start_with_windows
+            try:
+                set_start_with_windows(config.start_with_windows)
+            except OSError:
+                messagebox.showwarning(
+                    "Inicialização do Windows",
+                    "As configurações foram salvas. O Windows recusou a atualização da inicialização automática.",
+                    parent=self,
+                )
         self._refresh_dashboard()
-        return True
+        return config
 
     def _start(self):
-        if not self._save():
-            return
-        config = self._values()
-        if config is None:
-            return
+        config = self._save()
+        if config is not None:
+            self._start_monitor(config)
+
+    def _start_monitor(self, config):
         try:
             from .service import RadarService
             self._service = RadarService(config)
             self._service.start()
         except Exception as exc:
             self.log.error("Não foi possível iniciar: %s", type(exc).__name__)
-            messagebox.showerror("Falha ao iniciar", str(exc), parent=self)
+            self.state_var.set("Falha ao iniciar o radar")
+            self._restore_window()
             return
+        self._last_busy = True
+        self._stop_requested = False
         self.state_var.set("Conectando...")
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
@@ -376,6 +442,7 @@ class RadarApp(tk.Tk):
 
     def _stop_service(self):
         if self._service and self._service.busy:
+            self._stop_requested = True
             self._service.stop()
             self.state_var.set("Desligando com segurança...")
             self.stop_btn.configure(state="disabled")
@@ -394,10 +461,12 @@ class RadarApp(tk.Tk):
         def job():
             try:
                 from .service import test_credentials
-                reply = test_credentials(config)
-                self._events.put(("test_ok", reply, logging.INFO))
-            except Exception as exc:
-                self._events.put(("test_error", str(exc), logging.ERROR))
+                test_credentials(config)
+                self._events.put(("test_ok", "A mensagem de teste foi entregue no Telegram.", logging.INFO))
+            except Exception:
+                self._events.put(("test_error",
+                                  "Confira o token, o ID e se você enviou /start ao bot.",
+                                  logging.ERROR))
         threading.Thread(target=job, name="testar-telegram", daemon=True).start()
 
     def _open_dou(self):
@@ -468,15 +537,30 @@ class RadarApp(tk.Tk):
             elif typ == "test_error":
                 self.log.error(msg)
                 messagebox.showerror("Não foi possível enviar", msg, parent=self)
+            elif typ == "tray_ready":
+                self._tray_ready = True
+            elif typ == "tray_unavailable":
+                self._tray_ready = False
+                self.log.warning("O ícone da bandeja ficou indisponível.")
+                if not self._closing:
+                    self._restore_window()
+            elif typ == "tray_open":
+                self._restore_window()
+            elif typ == "tray_quit":
+                self._quit()
+        if self._instance is not None and self._instance.window_requested() and not self._closing:
+            self._restore_window()
         active = bool(self._service and self._service.running)
         busy = bool(self._service and self._service.busy)
         if active and not self._last_running:
             self.state_var.set("● Radar em funcionamento")
             self.check_btn.configure(state="normal")
-        elif self._last_running and not active and not busy:
-            self.state_var.set("Radar desligado")
+        elif self._last_busy and not busy:
+            self.state_var.set("Radar desligado" if self._stop_requested
+                               else "Radar interrompido. Consulte o registro.")
             self.check_btn.configure(state="disabled")
         self._last_running = active
+        self._last_busy = busy
         if not busy:
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
@@ -489,19 +573,89 @@ class RadarApp(tk.Tk):
         self.after(250, self._pump)
 
     def _close(self):
+        if self._tray_ready and not self._closing:
+            self.withdraw()
+            return
+        self._quit()
+
+    def _restore_window(self):
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+    def _quit(self):
+        if self._closing:
+            return
         if self._service and self._service.busy:
+            self._restore_window()
             if not messagebox.askyesno("Encerrar o Radar DOU?",
-                    "O monitoramento para quando você fecha a janela. Deseja encerrar?", parent=self):
+                    "Sair interrompe o monitoramento. Deseja encerrar?", parent=self):
                 return
             self._closing = True
             self._stop_service()
         else:
+            self._closing = True
+
+    def report_callback_exception(self, exc_type, _value, _traceback):
+        self.log.error("Erro na interface (%s).", exc_type.__name__)
+        if self._smoke:
+            self.smoke_result = 6
             self.destroy()
 
+    def smoke_gui(self):
+        """Verifica janela real, fechamento para a bandeja e reabertura."""
+        deadline = time.monotonic() + 15
 
-def main():
-    app = RadarApp()
-    app.mainloop()
+        def wait_for(ready, action):
+            if ready():
+                action()
+            elif time.monotonic() >= deadline:
+                self.smoke_result = 7
+                self.destroy()
+            else:
+                self.after(100, wait_for, ready, action)
+
+        def exercise_tray():
+            from .windows import WindowsInstance
+            self._close()
+            if self.state() != "withdrawn":
+                raise RuntimeError("A janela não foi para a bandeja")
+            with WindowsInstance() as duplicate:
+                if duplicate.primary:
+                    raise RuntimeError("Outra instância pôde ser iniciada")
+                duplicate.request_window()
+            wait_for(self.winfo_viewable, self.destroy)
+
+        wait_for(lambda: self.winfo_viewable()
+                 and (self._instance is None or self._tray_ready),
+                 self.destroy if self._instance is None else exercise_tray)
+
+
+def main(*, background=False, smoke=False):
+    if smoke and not os.environ.get("RADAR_DOU_HOME"):
+        return 5
+    if sys.platform == "win32":
+        from .windows import WindowsInstance
+        instance_context = WindowsInstance()
+    else:
+        instance_context = nullcontext()
+    with instance_context as instance:
+        if instance is not None and not instance.primary:
+            if not background and not smoke:
+                instance.request_window()
+            return 8 if smoke else 0
+        app = RadarApp(instance=instance, background=background and not smoke, smoke=smoke)
+        try:
+            if smoke:
+                app.after(100, app.smoke_gui)
+            app.mainloop()
+            return app.smoke_result
+        finally:
+            if app._tray:
+                app._tray.close()
+            for handler in list(app.log.handlers):
+                app.log.removeHandler(handler)
+                handler.close()
 
 
 if __name__ == "__main__":
