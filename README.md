@@ -2,7 +2,7 @@
 
 Acompanhe um nome no Diário Oficial da União e concursos nacionais ou da sua UF. O Radar guarda o histórico no dispositivo e avisa pelo Telegram quando encontra novidades.
 
-**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · **[Guia ilustrado](docs/GUIA_WINDOWS.md)** · **[Demonstração](docs/DEMONSTRACAO.md)** · [Android experimental](ANDROID.md) · [Desenvolvimento](docs/DESENVOLVIMENTO.md)
+**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · [Guia Windows](docs/GUIA_WINDOWS.md) · [Guia Android](ANDROID.md) · [Capturas do Telegram](https://github.com/BrandonSaraiva/Dou-e-Concursos/blob/main/docs/DEMONSTRACAO.md)
 
 ![Diagrama do download Windows pelo GitHub Releases e da versão de teste pelo GitHub Actions](assets/tutorial-download-windows.png)
 
@@ -12,7 +12,11 @@ Acompanhe um nome no Diário Oficial da União e concursos nacionais ou da sua U
 2. Abra o aplicativo, preencha seu ID numérico do Telegram e o token do bot criado no BotFather.
 3. Escolha os monitores, clique em **Salvar configurações**, teste a conexão e selecione **Ativar radar**.
 
-Se a primeira release ainda estiver em preparação, [baixe uma compilação de teste pelo Actions](docs/GUIA_WINDOWS.md#versão-de-teste-pelo-actions). O [guia ilustrado](docs/GUIA_WINDOWS.md) mostra como criar o bot, localizar seu ID, configurar o Radar e atualizar sem perder os dados.
+O [guia Windows](docs/GUIA_WINDOWS.md) mostra como criar o bot, localizar seu ID, configurar o Radar e atualizar sem perder os dados.
+
+## Comece pelo Android
+
+Consulte o [guia Android](ANDROID.md) para acompanhar a publicação do APK, configurar o bot e testar os alertas.
 
 ## O que o Radar acompanha
 
@@ -30,14 +34,8 @@ As fontes são a [pesquisa pública do DOU](https://www.in.gov.br/consulta/-/bus
 
 A [demonstração com capturas reais](docs/DEMONSTRACAO.md) mostra o menu, o status, as publicações do DOU, as listas nacional e estadual e as consultas manuais.
 
-<a href="docs/DEMONSTRACAO.md"><img src="assets/telegram-real/menu.png" width="420" alt="Menu real do Radar no Telegram, com o nome monitorado ocultado"></a>
+![Menu real do Radar no Telegram com o nome monitorado ocultado](assets/telegram-real/menu.png)
 
-## Por dentro do projeto
+Para relatar um problema, abra uma [Issue](https://github.com/BrandonSaraiva/Dou-e-Concursos/issues) e omita tokens, IDs e dados monitorados.
 
-- **Interface e execução.** Tkinter no Windows e Kivy na versão experimental Android. O serviço agenda consultas e conversa com o Telegram.
-- **Dados locais.** SQLite mantém o catálogo, o histórico de publicações e a fila de alertas. No Windows, o token é protegido pelo DPAPI da conta que o salvou.
-- **Entrega.** O GitHub Actions testa o projeto e empacota o Windows com PyInstaller. Depois de validar um build da `main`, publica o executável, o SHA-256 e o commit de origem em Releases.
-
-O [guia de desenvolvimento](docs/DESENVOLVIMENTO.md) detalha a arquitetura, os testes, a compilação e o processo de publicação. Para reportar um problema, use a [página de Issues](https://github.com/BrandonSaraiva/Dou-e-Concursos/issues) e omita tokens, IDs e dados monitorados.
-
-Projeto distribuído sob a [licença MIT](LICENSE).
+Projeto distribu?do sob a [licen?a MIT](LICENSE).

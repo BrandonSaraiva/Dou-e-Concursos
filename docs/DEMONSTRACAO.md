@@ -1,6 +1,6 @@
 # Demonstração do Radar
 
-[Voltar ao projeto](../README.md) · [Instalar e configurar](GUIA_WINDOWS.md) · [Desenvolvimento](DESENVOLVIMENTO.md)
+[Voltar ao projeto](../README.md) · [Guia Windows](GUIA_WINDOWS.md) · [Guia Android](../ANDROID.md)
 
 O Radar consulta as fontes enquanto estiver ativo. Você pode fechar a janela do Windows, deixar o ícone na bandeja e acompanhar as novidades no chat privado do seu bot.
 
@@ -78,21 +78,6 @@ Estas duas prévias usam dados fictícios. O gerador usa o próprio código do R
 | **Uma fonte falha** | Preserva o último histórico bem-sucedido. | O **Registro de atividades** e **`/status`** indicam a falha. |
 | **Um aviso fica pendente** | Persiste a fila e tenta a entrega de novo em outro ciclo. | **`/status`** mostra pendências. Uma confirmação perdida pode provocar um reenvio. |
 
-```mermaid
-flowchart LR
-    A["Consulta agendada ou manual"] --> B["Busca no DOU e catálogos ativos"]
-    B --> C{"A consulta retornou dados válidos?"}
-    C -->|Sim| D["Atualiza o histórico no SQLite"]
-    C -->|Falhou| E["Registra a falha e preserva o histórico"]
-    D --> F{"Primeira consulta bem-sucedida?"}
-    F -->|Sim| H["Salva a referência inicial"]
-    F -->|Já havia referência| G["Enfileira as novidades"]
-    E --> I["Verifica os alertas pendentes"]
-    H --> I
-    G --> I
-    I --> J["Envia os avisos da fila ao chat privado"]
-```
-
 ## Repita o fluxo no seu computador
 
 1. Siga o [guia Windows](GUIA_WINDOWS.md) para configurar o seu próprio bot.
@@ -104,7 +89,3 @@ flowchart LR
 4. Deixe o Radar na bandeja para acompanhar as próximas verificações. Você também pode usar `/verificar` para consultar a fonte no momento. Uma nova consulta só gera um alerta novo quando encontra uma novidade em relação à referência. As consultas ficam pausadas enquanto o PC estiver desligado ou suspenso.
 
 Ao compartilhar um print, oculte dados pessoais. Mantenha o token do bot, o ID da sua conta, o arquivo de configuração e o histórico local em privado.
-
-## Confira o cenário sem conectar um bot
-
-Os [testes da integração](../tests/test_service_concursos.py) simulam o Telegram. Eles verificam que a primeira lista não gera alertas retroativos, que uma oportunidade nova gera aviso e que a mesma oportunidade não é enviada de novo no ciclo seguinte. O [guia de desenvolvimento](DESENVOLVIMENTO.md#execute-o-projeto-no-windows) mostra como executar a suíte.

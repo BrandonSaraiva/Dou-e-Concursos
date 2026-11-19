@@ -1,6 +1,6 @@
 # Guia do Radar DOU no Windows
 
-[Voltar ao projeto](../README.md) · [Android experimental](../ANDROID.md) · [Desenvolvimento](DESENVOLVIMENTO.md)
+[Voltar ao projeto](../README.md) · [Guia Android](../ANDROID.md)
 
 ## 1. Baixe e abra o Radar
 
@@ -16,14 +16,14 @@ Você precisa de Windows x64, conexão com a internet e uma conta do Telegram. O
 
 ### Versão de teste pelo Actions
 
-Use este caminho enquanto a primeira versão pública estiver em preparação ou se quiser testar a compilação de um Pull Request.
+Use este caminho para testar uma compilação específica antes de ela ser publicada em Releases.
 
 1. Entre na sua conta do GitHub, abra o [repositório](https://github.com/BrandonSaraiva/Dou-e-Concursos) e clique em **Actions**.
 2. Na lateral esquerda, escolha **Compilar RadarDOU para Windows**. Clique na execução concluída com sucesso correspondente à branch ou ao Pull Request que quer testar.
 3. Na página da execução, desça até **Artifacts** e clique em **RadarDOU-Windows-x64**. O workflow mantém esse ZIP por 30 dias.
 4. Em **Downloads**, clique com o botão direito no ZIP, escolha **Extrair Tudo…** e abra **RadarDOU.exe** na pasta extraída.
 
-Os dois downloads incluem `SHA256SUMS.txt` e `SOURCE_COMMIT.txt`, disponíveis separadamente em Releases e dentro do ZIP do Actions. Consulte [como conferir o SHA-256](DESENVOLVIMENTO.md#conferir-o-executável-baixado).
+Os dois downloads incluem `SHA256SUMS.txt` e `SOURCE_COMMIT.txt`, disponíveis separadamente em Releases e dentro do ZIP do Actions. Para verificar a integridade, compare a saída de `Get-FileHash .\RadarDOU.exe -Algorithm SHA256` no PowerShell com o hash publicado.
 
 ## 2. Crie seu bot no Telegram
 
@@ -64,7 +64,16 @@ Cole o token apenas no Radar. Se ele for exposto, revogue-o no BotFather, gere o
 
 ### Comandos no Telegram
 
-Veja [capturas reais das respostas no Telegram](DEMONSTRACAO.md) e o fluxo completo entre a consulta e o alerta.
+Veja exemplos reais de status e concursos abaixo. A [galeria completa](https://github.com/BrandonSaraiva/Dou-e-Concursos/blob/main/docs/DEMONSTRACAO.md) também mostra o menu, o DOU e as consultas manuais.
+
+<details>
+<summary>Capturas reais do Telegram</summary>
+
+![Status do Radar com a ?ltima consulta e os totais](../assets/telegram-real/status.png)
+
+![Central de concursos com as opções Nacional e DF](../assets/telegram-real/central-concursos.png)
+
+</details>
 
 | Comando | O que faz |
 | --- | --- |
