@@ -26,7 +26,10 @@ jobs:
           python -m pip install 'buildozer==1.6.0' 'Cython==0.29.37' setuptools
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           "$sdkmanager" --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
-          sed -i "/^android.ndk =/a android.sdk_path = $ANDROID_HOME\nandroid.ndk_path = $ANDROID_HOME/ndk/28.2.13676358" buildozer.spec
+          if [[ ! -e "$ANDROID_HOME/tools" ]]; then
+            ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
+          fi
+          sed -i "/^android.ndk =/a android.sdk_path = $ANDROID_HOME\nandroid.ndk_path = $ANDROID_HOME/ndk/28.2.13676358\nandroid.skip_update = True" buildozer.spec
       - name: Compilar e validar o instalador ARM64 assinado
         run: |
           buildozer android debug
