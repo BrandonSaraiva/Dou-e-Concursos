@@ -165,3 +165,60 @@ def test_stop_before_thread_initializes(monkeypatch):
     service._thread.join(5)
     assert not service.busy
     assert calls == []
+
+
+def test_temporary_telegram_startup_failure_is_retried(tmp_path, monkeypatch):
+    from telegram.error import NetworkError
+    from telegram.ext import Application
+
+    monkeypatch.setenv("RADAR_DOU_HOME", str(tmp_path))
+    service = RadarService(AppConfig("Nome de teste", 123, FAKE_TOKEN))
+    attempts = 0
+    events = []
+
+    async def initialize(self):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise NetworkError("Temporary failure")
+
+    async def start(self):
+        events.append("started")
+
+    async def stop(self):
+        events.append("stopped")
+
+    async def shutdown(self):
+        events.append("shutdown")
+
+    async def start_polling(self, **kwargs):
+        events.append("polling")
+
+    async def stop_polling(self):
+        events.append("polling stopped")
+
+    async def check_all(app):
+        service._stop.set()
+
+    async def timeout_immediately(awaitable, timeout):
+        awaitable.close()
+        raise asyncio.TimeoutError
+
+    from telegram.ext import Updater
+
+    monkeypatch.setattr(Application, "initialize", initialize)
+    monkeypatch.setattr(Application, "start", start)
+    monkeypatch.setattr(Application, "stop", stop)
+    monkeypatch.setattr(Application, "shutdown", shutdown)
+    monkeypatch.setattr(Updater, "start_polling", start_polling)
+    monkeypatch.setattr(Updater, "stop", stop_polling)
+    monkeypatch.setattr(service, "_check_all", check_all)
+    monkeypatch.setattr(asyncio, "wait_for", timeout_immediately)
+
+    async def run():
+        service._stop = asyncio.Event()
+        await service._run()
+
+    asyncio.run(run())
+    assert attempts == 2
+    assert events == ["polling", "started", "polling stopped", "stopped", "shutdown"]

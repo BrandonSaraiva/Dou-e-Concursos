@@ -311,9 +311,8 @@ class ConcursoClient:
             except requests.RequestException as exc:
                 raise ConcursoError(f"Portal Concursos no Brasil indisponível ({type(exc).__name__})") from exc
             content_type = response.headers.get("Content-Type", "")
-            LOG.info("CONCURSOS %s: HTTP %s em %s (%s bytes; tipo %s)",
-                     scope, response.status_code, response.url,
-                     len(response.content), content_type or "não informado")
+            LOG.info("CONCURSOS %s: HTTP %s (%s bytes).",
+                     scope, response.status_code, len(response.content))
             if "text/html" not in content_type.lower():
                 raise ConcursoError("Portal não retornou HTML (pode ser bloqueio de acesso)")
             page = parse_concursos_html(response.text, scope, page_url=response.url)
@@ -383,6 +382,6 @@ class ConcursoClient:
             except Exception as browser_error:
                 raise ConcursoError(
                     f"HTTP: {str(http_error)[:180]}; "
-                    f"navegador: {type(browser_error).__name__}: {str(browser_error)[:170]}. "
+                    f"navegador: {type(browser_error).__name__}. "
                     "Histórico preservado"
                 ) from browser_error

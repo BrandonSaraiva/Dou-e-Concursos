@@ -30,6 +30,12 @@ def test_invalid_count_keeps_history_safe():
         parse_search_html(HTML.replace("2 resultados", "1 resultado"))
 
 
+def test_publication_url_ignores_tracking_without_changing_identity():
+    original = parse_search_html(HTML).publications[0]
+    tracked = parse_search_html(HTML.replace("edital-001", "edital-001?utm_medium=site#trecho"))
+    assert (tracked.publications[0].url, tracked.publications[0].uid) == (original.url, original.uid)
+
+
 def test_quoted_search_is_same_as_original_project():
     params = search_parameters("  Maria   da Silva  ")
     assert params == {"q": '" Maria da Silva"', "s": "todos", "exactDate": "all", "sortType": "0"}
