@@ -11,13 +11,19 @@ import os
 import sys
 import threading
 
-from .concursos import ConcursoClient, ConcursoSnapshot, UF_NAMES, listing_url
+from .concursos import ConcursoClient, UF_NAMES, listing_url
 from .database import Store
-from .messages import friendly_timestamp, publication_card, safe, status_card
+from .messages import friendly_timestamp, message_lines, publication_card, safe, status_card
 from .scraper import DOUClient, SEARCH_ENDPOINT
 from .settings import AppConfig, database_file
 
 LOG = logging.getLogger("radar_dou.service")
+
+
+def _suppress_private_logs() -> None:
+    # SDKs podem registrar a URL completa, o token e o conteúdo de atualizações.
+    for library in ("telegram", "httpx", "httpcore", "urllib3"):
+        logging.getLogger(library).setLevel(logging.CRITICAL + 1)
 
 
 def contest_card(entry) -> str:
@@ -26,9 +32,9 @@ def contest_card(entry) -> str:
     return ("<b>🚨 NOVO CONCURSO NO RADAR!</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             f"{area}\n\n"
-            f"🏛 <b>{safe(entry['organization'])}</b>\n"
-            f"📋 {safe(entry['title'])}\n"
-            f"👥 <b>Vagas:</b> {safe(entry['vacancies'])}\n\n"
+            f"🏛 <b>{safe(entry['organization'], 180)}</b>\n"
+            f"📋 {safe(entry['title'], 300)}\n"
+            f"👥 <b>Vagas:</b> {safe(entry['vacancies'], 100)}\n\n"
             "<i>Informação do portal Concursos no Brasil. Confira o edital e o prazo de inscrição na fonte oficial.</i>")
 
 
@@ -38,6 +44,7 @@ class RadarService:
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._stop: asyncio.Event | None = None
+        self._stop_requested = threading.Event()
         self._started = threading.Event()
         self._stopped = threading.Event()
         self._manual_checks: set[asyncio.Task] = set()
@@ -55,19 +62,28 @@ class RadarService:
             raise RuntimeError("O monitoramento já está em execução")
         self._started.clear()
         self._stopped.clear()
+        self._stop_requested.clear()
         self._thread = threading.Thread(target=self._thread_main, name="radar-monitor", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
-        if self._loop and self._stop:
-            self._loop.call_soon_threadsafe(self._stop.set)
+        self._stop_requested.set()
+        loop, stop = self._loop, self._stop
+        if loop and stop:
+            try:
+                loop.call_soon_threadsafe(stop.set)
+            except RuntimeError:  # A thread already finishing may have closed the loop.
+                return
             LOG.info("Parada solicitada; a consulta em andamento será concluída com segurança.")
 
     def check_now(self) -> bool:
-        if not self.running or not self._loop:
+        loop = self._loop
+        if not self.running or not loop or self._stop_requested.is_set():
             return False
 
         def enqueue():
+            if self._stop_requested.is_set() or self._manual_checks:
+                return
             if self._dou_lock.locked() or self._contest_lock.locked():
                 LOG.info("Já há consulta em andamento. Não vou iniciar uma duplicada.")
                 return
@@ -75,7 +91,10 @@ class RadarService:
             self._manual_checks.add(task)
             task.add_done_callback(self._manual_checks.discard)
 
-        self._loop.call_soon_threadsafe(enqueue)
+        try:
+            loop.call_soon_threadsafe(enqueue)
+        except RuntimeError:
+            return False
         return True
 
     def _thread_main(self) -> None:
@@ -84,7 +103,8 @@ class RadarService:
         asyncio.set_event_loop(loop)
         self._stop = asyncio.Event()
         try:
-            loop.run_until_complete(self._run())
+            if not self._stop_requested.is_set():
+                loop.run_until_complete(self._run())
         except Exception as exc:
             LOG.error("Serviço interrompido (%s). Confira internet, token e se outro dispositivo usa o mesmo bot.",
                       type(exc).__name__)
@@ -92,8 +112,8 @@ class RadarService:
             try:
                 loop.run_until_complete(loop.shutdown_asyncgens())
                 loop.run_until_complete(loop.shutdown_default_executor())
-            except Exception:
-                LOG.exception("Problema ao concluir tarefas de rede")
+            except Exception as exc:
+                LOG.error("Problema ao concluir tarefas de rede (%s)", type(exc).__name__)
             loop.close()
             self._loop = None
             self._stop = None
@@ -102,8 +122,11 @@ class RadarService:
             LOG.info("Monitoramento desligado.")
 
     async def _run(self) -> None:
-        from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup as M, Update
+        _suppress_private_logs()
+
+        from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup as M
         from telegram.constants import ParseMode
+        from telegram.error import NetworkError
         from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
         config = self.config
@@ -206,7 +229,7 @@ class RadarService:
                     lines.append(f"  Atualizado: {safe(last)}")
                     if st and st["last_error"]:
                         lines.append(f"  ⚠ {safe(st['last_error'][:100])}")
-            await send(update, "\n".join(lines)[:3800], markup=main_buttons())
+            await send(update, message_lines(lines), markup=main_buttons())
 
         async def latest_cmd(update, context):
             if not await permitted(update):
@@ -221,10 +244,10 @@ class RadarService:
                 return
             body = ["<b>📚 ÚLTIMAS PUBLICAÇÕES DOU</b>", ""]
             for idx, row in enumerate(rows, 1):
-                body.extend([f"<b>{idx}. {safe(row['title'])}</b>",
-                             f"📅 {safe(row['pub_date'])} · {safe(row['organization'])}",
+                body.extend([f"<b>{idx}. {safe(row['title'], 160)}</b>",
+                             f"📅 {safe(row['pub_date'], 30)} · {safe(row['organization'], 100)}",
                              f'<a href="{safe(row["url"])}">Abrir publicação</a>', ""])
-            await send(update, "\n".join(body)[:3800], markup=main_buttons())
+            await send(update, message_lines(body), markup=main_buttons())
 
         async def contest_menu_cmd(update, context, *, edit=False):
             if not await permitted(update):
@@ -273,9 +296,9 @@ class RadarService:
                 lines.append("Nenhuma oportunidade listada na última consulta íntegra.")
             else:
                 for index, row in enumerate(store.contest_list(config.telegram_id, scope, limit=5,offset=offset), offset+1):
-                    lines.extend([f'<b>{index:02d}. <a href="{safe(row["url"])}">{safe(row["organization"])}</a></b>',
-                                  f"👥 Vagas: {safe(row['vacancies'])}",
-                                  f"📝 {safe(row['title'][:160])}", ""])
+                    lines.extend([f'<b>{index:02d}. <a href="{safe(row["url"])}">{safe(row["organization"], 140)}</a></b>',
+                                  f"👥 Vagas: {safe(row['vacancies'], 80)}",
+                                  f"📝 {safe(row['title'], 160)}", ""])
             if status and status["last_error"]:
                 lines.append("⚠ Última tentativa falhou; lista salva anteriormente.")
             from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup as M
@@ -290,7 +313,7 @@ class RadarService:
                          B(f"📍 {config.uf or 'Estado'}", callback_data="ct:UF:0")])
             menu.append([B("↻ Atualizar", callback_data="check_contests"),
                          B("🏠 Início", callback_data="home")])
-            await send(update, "\n".join(lines)[:3700], markup=M(menu), edit=edit)
+            await send(update, message_lines(lines), markup=M(menu), edit=edit)
 
         async def help_cmd(update, context):
             if not await permitted(update):
@@ -366,6 +389,9 @@ class RadarService:
             if context.error:
                 LOG.warning("Falha na comunicação com Telegram (%s)", type(context.error).__name__)
 
+        def polling_error(error):
+            LOG.warning("Falha no recebimento de mensagens do Telegram (%s)", type(error).__name__)
+
         app = Application.builder().token(config.token).build()
         self._app = app
         commands = (
@@ -393,33 +419,55 @@ class RadarService:
         active_check = None
         try:
             LOG.info("Conectando ao Telegram para validar as credenciais...")
-            await app.initialize()
-            initialized = True
-            me = await app.bot.get_me()
-            LOG.info("Telegram autenticado: @%s (ID %s).", me.username, me.id)
+            delay = 2
+            while not self._stop_requested.is_set():
+                try:
+                    if not initialized:
+                        await app.initialize()
+                        initialized = True
+                    await app.updater.start_polling(
+                        drop_pending_updates=False, timeout=15, error_callback=polling_error)
+                    polling = True
+                    break
+                except NetworkError as exc:
+                    LOG.warning("Telegram indisponível (%s). Nova tentativa em %s s.",
+                                type(exc).__name__, delay)
+                    try:
+                        await asyncio.wait_for(self._stop.wait(), timeout=delay)
+                    except asyncio.TimeoutError:
+                        delay = min(delay * 2, 60)
+            if self._stop_requested.is_set():
+                return
+            LOG.info("Bot autenticado no Telegram.")
             await app.start()
             started = True
-            await app.updater.start_polling(drop_pending_updates=False, timeout=15)
-            polling = True
             self._started.set()
             LOG.info("RADAR ATIVO. DOU: %s | Concursos: %s; checagem de concursos a cada 60 minutos.",
                      "sim" if config.monitor_dou else "não", "sim" if config.monitor_concursos else "não")
             active_check = asyncio.create_task(self._check_all(app))
             await self._stop.wait()
-            if active_check and not active_check.done():
-                LOG.info("Aguardando consulta em andamento para salvar o histórico...")
-                await active_check
         finally:
-            if self._manual_checks:
-                await asyncio.gather(*list(self._manual_checks), return_exceptions=True)
             self._started.clear()
-            if polling:
-                await app.updater.stop()
-            if started:
-                await app.stop()
-            if initialized:
-                await app.shutdown()
-            store.close()
+            checks = list(self._manual_checks)
+            if active_check is not None:
+                checks.append(active_check)
+            try:
+                if polling:
+                    await app.updater.stop()
+            finally:
+                try:
+                    if checks:
+                        await asyncio.gather(*checks, return_exceptions=True)
+                    if started:
+                        await app.stop()
+                finally:
+                    try:
+                        if initialized:
+                            await app.shutdown()
+                    finally:
+                        self._client.session.close()
+                        self._contest_client.session.close()
+                        store.close()
 
     async def _check_all(self, app) -> list[str]:
         tasks = []
@@ -442,81 +490,84 @@ class RadarService:
     async def _check_cycle(self, app) -> str:
         from telegram.constants import ParseMode
         from telegram.error import TelegramError
+        if self._stop_requested.is_set():
+            return "DOU: monitoramento encerrando."
         if self._dou_lock.locked():
             return "DOU: já existe verificação em andamento."
         async with self._dou_lock:
             watch = self._store.watch(self.config.telegram_id)
             if not watch:
                 return "DOU: sem monitor configurado."
+            summary = "⚠ DOU: consulta indisponível; dados anteriores preservados."
             try:
-                LOG.info("DOU: iniciando busca por %s.", self.config.name)
+                LOG.info("DOU: iniciando busca.")
                 snap = await asyncio.to_thread(self._client.fetch, self.config.name)
                 added, baseline = self._store.ingest(watch["id"], snap)
                 LOG.info("DOU: %s publicação(ões) encontradas; %s inédita(s).", snap.total, added)
-                sent = 0
                 if baseline:
                     LOG.info("DOU: primeira consulta salva sem notificações antigas.")
+                    summary = f"✅ DOU: referência inicial com {snap.total} publicações."
                 else:
-                    for pub in self._store.pending(watch["id"], limit=60):
-                        try:
-                            await app.bot.send_message(chat_id=self.config.telegram_id,
-                                  text=publication_card(pub), parse_mode=ParseMode.HTML,
-                                  disable_web_page_preview=True)
-                        except TelegramError as exc:
-                            self._store.mark_send_error(watch["id"], pub["uid"], type(exc).__name__)
-                            LOG.warning("DOU: alerta não entregue (%s), mantido na fila.", type(exc).__name__)
-                            break
-                        else:
-                            self._store.mark_sent(watch["id"], pub["uid"])
-                            sent += 1
-                            await asyncio.sleep(1.05)
-                LOG.info("DOU: consulta concluída; %s notificações entregues.", sent)
-                return (f"✅ DOU: referência inicial com {snap.total} publicações." if baseline else
-                        f"✅ DOU: {snap.total} resultados, {added} novos, {sent} alertas enviados.")
+                    summary = f"✅ DOU: {snap.total} resultados, {added} novos."
             except Exception as exc:
-                message = f"{type(exc).__name__}: {str(exc)[:270]}"
-                self._store.set_error(watch["id"], message)
-                LOG.error("DOU: consulta falhou (%s). Histórico preservado.", message)
-                return "⚠ DOU: consulta indisponível; dados anteriores preservados."
+                detail = type(exc).__name__
+                self._store.set_error(watch["id"], f"Consulta ao DOU indisponível ({detail})")
+                LOG.warning("DOU: consulta falhou (%s). Histórico preservado.", detail)
+
+            # Pendências do Telegram podem ser entregues mesmo quando o DOU está fora do ar.
+            sent = 0
+            for pub in self._store.pending(watch["id"], limit=60):
+                if self._stop_requested.is_set():
+                    break
+                try:
+                    await app.bot.send_message(chat_id=self.config.telegram_id,
+                          text=publication_card(pub), parse_mode=ParseMode.HTML,
+                          disable_web_page_preview=True)
+                except TelegramError as exc:
+                    self._store.mark_send_error(watch["id"], pub["uid"], type(exc).__name__)
+                    LOG.warning("DOU: alerta não entregue (%s), mantido na fila.", type(exc).__name__)
+                    break
+                self._store.mark_sent(watch["id"], pub["uid"])
+                sent += 1
+                await asyncio.sleep(1.05)
+            LOG.info("DOU: %s notificações entregues neste ciclo.", sent)
+            return f"{summary} {sent} alertas enviados." if sent else summary
 
     async def _check_contests(self, app) -> list[str]:
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         from telegram.constants import ParseMode
         from telegram.error import TelegramError
+        if self._stop_requested.is_set():
+            return ["Concursos: monitoramento encerrando."]
         if self._contest_lock.locked():
             return ["Concursos: outra conferência está em andamento."]
         async with self._contest_lock:
             config = self.config
             results = []
-            national_urls = set()
             for scope in ("BR", *((config.uf,) if config.uf else ())):
+                if self._stop_requested.is_set():
+                    break
                 try:
                     LOG.info("CONCURSOS %s: conectando ao portal %s", scope, listing_url(scope))
                     snap = await asyncio.to_thread(self._contest_client.fetch, scope)
-                    # A categoria local frequentemente repete concursos nacionais.
-                    # Nacional deve aparecer somente na lista Nacional.
-                    if scope != "BR":
-                        if not national_urls:
-                            national_urls = {r["url"] for r in
-                                self._store.contest_list(config.telegram_id, "BR", limit=10000)}
-                        if national_urls:
-                            snap = ConcursoSnapshot(scope, tuple(c for c in snap.contests
-                                     if c.url not in national_urls), snap.page_url)
-                    else:
-                        national_urls = {c.url for c in snap.contests}
+                    if snap.scope != scope:
+                        raise ValueError("Catálogo de região inesperada")
                     added, baseline = self._store.ingest_contests(config.telegram_id, snap)
+                    current, _ = self._store.contest_counts(config.telegram_id, scope)
                     LOG.info("CONCURSOS %s: %s oportunidades abertas, %s URLs inéditas, referência inicial=%s.",
-                             scope, len(snap.contests), added, baseline)
-                    results.append(f"✅ Concursos {scope}: {len(snap.contests)} abertos" +
+                             scope, current, added, baseline)
+                    results.append(f"✅ Concursos {scope}: {current} abertos" +
                                    (" (referência inicial)." if baseline else f", {added} novos."))
                 except Exception as exc:
-                    message = f"{type(exc).__name__}: {str(exc)[:230]}"
-                    self._store.set_contests_error(config.telegram_id, scope, message)
-                    LOG.error("CONCURSOS %s: %s. Histórico anterior preservado.", scope, message)
+                    detail = type(exc).__name__
+                    self._store.set_contests_error(config.telegram_id, scope, f"Consulta indisponível ({detail})")
+                    LOG.warning("CONCURSOS %s: %s. Histórico anterior preservado.", scope, detail)
                     results.append(f"⚠ Concursos {scope}: consulta falhou; histórico mantido.")
             delivered = 0
             for entry in self._store.pending_contests(config.telegram_id, limit=30,
                                     scopes=("BR", *((config.uf,) if config.uf else ()))):
+                if self._stop_requested.is_set():
+                    break
                 try:
                     controls = InlineKeyboardMarkup([
                         [InlineKeyboardButton("📄 Ver detalhes do concurso", url=entry["url"])],
@@ -541,16 +592,16 @@ class RadarService:
 
 
 async def _test_credentials_async(config: AppConfig) -> str:
+    _suppress_private_logs()
     from telegram import Bot
     from telegram.error import TelegramError
     try:
         async with Bot(config.token) as bot:
-            me = await bot.get_me()
             await bot.send_message(chat_id=config.telegram_id,
                 text="✅ Radar conectado! O Telegram receberá alertas de DOU e/ou concursos conforme suas escolhas.")
-            return f"Mensagem entregue ao ID {config.telegram_id} via @{me.username}."
+            return "Mensagem de teste entregue no Telegram."
     except TelegramError as exc:
-        raise RuntimeError(f"Telegram indisponível ({type(exc).__name__}). Confira o token, o ID e se enviou /start ao bot.") from exc
+        raise RuntimeError(f"Telegram indisponível ({type(exc).__name__}). Confira o token, o ID e se enviou /start ao bot.") from None
 
 
 def test_credentials(config: AppConfig) -> str:

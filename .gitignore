@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.buildozer/
+build/
+dist/
+bin/
+*.egg-info/
+RadarDOU.spec
+*.exe
+*.apk
+
+# Dados locais, mesmo quando RADAR_DOU_HOME aponta para o checkout.
+.env
+.env.*
+config.json
+.config-*.tmp
+config.tmp
+radar.sqlite3*
+radar.log*
+falha_inicializacao.txt
+monitor.json
+heartbeat.json
+manual-check.request
+playwright-browsers/

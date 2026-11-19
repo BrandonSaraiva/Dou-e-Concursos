@@ -2,3 +2,4 @@ python-telegram-bot[job-queue]>=22.5,<23
 beautifulsoup4>=4.12,<5
 requests>=2.31,<3
 playwright>=1.55,<2
+pystray>=0.19.5,<0.20; platform_system == "Windows"

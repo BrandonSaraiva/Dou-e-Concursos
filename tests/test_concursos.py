@@ -53,6 +53,22 @@ def test_parse_state_open_and_skip_predicted():
     assert [x.vacancies for x in data.contests if x.organization=="ANCINE"] == ["Várias"]
 
 
+def test_category_with_only_marked_forecasts_is_valid_empty():
+    html = NATIONAL.replace("<tr><td>", "<tr class='previsto'><td>", 1)
+    html = html.replace("href='/concursos/anpd/'", "href='/concursos/br/anpd/'")
+    assert parse_concursos_html(html, "BR").contests == ()
+
+
+def test_query_pagination_and_wrong_scope_rejection():
+    from radar_dou.concursos import ConcursoClient
+
+    first_url = listing_url("DF")
+    page = "<main><a rel='next' href='?paged=2'>Próxima</a></main>"
+    assert ConcursoClient._next_page(page, first_url, first_url) == first_url + "?paged=2"
+    with pytest.raises(ConcursoError, match="paginação"):
+        ConcursoClient._next_page(page.replace("?paged=2", "/concursos/sp/page/2/"), first_url, first_url)
+
+
 def test_bad_html_and_wrong_region_dont_wipe_data():
     with pytest.raises(ConcursoError):
         parse_concursos_html("<html><title>Blocked</title></html>","DF")
@@ -188,7 +204,35 @@ def test_move_between_categories_does_not_send_same_url_twice(tmp_path):
     db.ingest_contests(123,first)
     db.ingest_contests(123,ConcursoSnapshot("DF",(),listing_url("DF")))
     assert db.ingest_contests(123,local)==(1,False)
+    assert db.contest_counts(123,"DF")==(0,0)
+    db.ingest_contests(123,ConcursoSnapshot("BR",(),listing_url("BR")))
     assert db.contest_counts(123,"DF")==(1,0)
+    db.close()
+
+
+def test_queued_state_alert_follows_contest_to_national_scope(tmp_path):
+    path = tmp_path / "contests.sqlite"
+    entry = Concurso("Órgão", "10", "Edital", "https://concursosnobrasil.com/concurso-orgao/")
+    with_national = ConcursoSnapshot("BR", (entry,), listing_url("BR"))
+    with_state = ConcursoSnapshot("DF", (entry,), listing_url("DF"))
+    db = Store(path)
+    for scope in ("BR", "DF"):
+        assert db.ingest_contests(123, ConcursoSnapshot(scope, (), listing_url(scope))) == (0, True)
+    db.ingest_contests(123, with_state)
+    assert db.contest_counts(123, "DF") == (1, 1)
+    db.close()
+
+    db = Store(path)
+    db.ingest_contests(123, with_national)
+    db.ingest_contests(123, ConcursoSnapshot("DF", (), listing_url("DF")))
+    pending = db.pending_contests(123, scopes=("BR", "SP"))
+    assert [(row["scope"], row["url"]) for row in pending] == [("BR", entry.url)]
+    assert db.contest_counts(123, "BR") == (1, 1)
+    db.mark_contest_sent(123, "BR", entry.url)
+    db.ingest_contests(123, with_state)
+    assert db.pending_contests(123) == []
+    assert db.contest_counts(123, "BR") == (1, 0)
+    assert db.contest_counts(123, "DF") == (0, 0)
     db.close()
 
 

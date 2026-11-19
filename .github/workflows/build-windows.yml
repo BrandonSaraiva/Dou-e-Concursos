@@ -1,89 +1,87 @@
-name: Criar executável Windows
+name: Compilar RadarDOU para Windows
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
-    branches: [main, master]
-    paths:
-      - main.py
-      - 'radar_dou/**'
-      - requirements.txt
-      - requirements-dev.txt
-      - GERAR_EXE_WINDOWS.bat
-      - '.github/workflows/build-windows.yml'
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: radar-windows-build-${{ github.ref }}
-  cancel-in-progress: false
+  group: radar-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Testar e compilar Windows x64
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
-      - name: Obter código exato do commit
-        uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: true
-      - name: Preparar Python (apenas na máquina de compilação)
-        uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
           architecture: x64
       - name: Instalar dependências
-        shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
-      - name: Testes do código
+      - name: Testar código
         run: python -m pytest -q
-      - name: Compilar EXE Windows sem dependência de Python instalado
+      - name: Empacotar e testar o executável
         shell: pwsh
-        run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name RadarDOU --collect-all telegram --collect-all apscheduler --collect-all playwright --collect-all certifi main.py
-          if (!(Test-Path dist/RadarDOU.exe)) { throw 'O executável não foi gerado' }
-      - name: Autoteste do EXE realmente compilado
-        shell: pwsh
-        run: |
-          $process = Start-Process -FilePath (Resolve-Path 'dist/RadarDOU.exe') -ArgumentList '--self-test' -Wait -PassThru
-          if ($process.ExitCode -ne 0) {
-            if (Test-Path "$env:TEMP\radar-dou-self-test-erro.txt") {
-              Get-Content "$env:TEMP\radar-dou-self-test-erro.txt"
-            }
-            throw "Executável falhou no autoteste: $($process.ExitCode)"
-          }
+        run: ./scripts/build-windows.ps1
       - name: Gerar manifesto de integridade
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force downloads | Out-Null
-          Copy-Item dist/RadarDOU.exe downloads/RadarDOU.exe -Force
-          "Código-fonte compilado: $env:GITHUB_SHA" | Set-Content -Encoding utf8 downloads/SOURCE_COMMIT.txt
-          $hash = (Get-FileHash downloads/RadarDOU.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  RadarDOU.exe" | Set-Content -Encoding ascii downloads/SHA256SUMS.txt
-          Write-Host "SHA256: $hash"
-      - name: Disponibilizar download como artefato
-        uses: actions/upload-artifact@v4
+          $env:GITHUB_SHA | Set-Content -Encoding ascii dist/SOURCE_COMMIT.txt
+          $hash = (Get-FileHash dist/RadarDOU.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  RadarDOU.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Guardar executável validado
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: RadarDOU-Windows-${{ github.sha }}
+          name: RadarDOU-Windows-x64
           path: |
-            downloads/RadarDOU.exe
-            downloads/SOURCE_COMMIT.txt
-            downloads/SHA256SUMS.txt
+            dist/RadarDOU.exe
+            dist/SOURCE_COMMIT.txt
+            dist/SHA256SUMS.txt
           if-no-files-found: error
+          overwrite: true
           retention-days: 30
-      - name: Adicionar executável ao repositório automaticamente
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        shell: pwsh
+
+  release:
+    name: Publicar executável em Releases
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Baixar executável validado
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: RadarDOU-Windows-x64
+      - name: Conferir integridade e publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f downloads/RadarDOU.exe downloads/SOURCE_COMMIT.txt downloads/SHA256SUMS.txt
-          if ((git diff --cached --name-only).Length -eq 0) {
-            Write-Host 'Mesmo executável já estava publicado.'
+          current_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$current_sha" != "$GITHUB_SHA" ]]; then
+            echo "A main avançou. A versão deve ser publicada pelo workflow do commit mais recente."
             exit 0
-          }
-          git commit -m "build: atualizar RadarDOU.exe compilado e validado [skip ci]"
-          git push origin "HEAD:${{ github.ref_name }}"
+          fi
+          test "$(tr -d '\r\n' < SOURCE_COMMIT.txt)" = "$GITHUB_SHA"
+          tr -d '\r' < SHA256SUMS.txt | sha256sum --check
+          tag="windows-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" RadarDOU.exe SHA256SUMS.txt SOURCE_COMMIT.txt \
+            --target "$GITHUB_SHA" \
+            --title "Radar DOU + Concursos para Windows x64 ($GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT)" \
+            --notes "Executável validado pelo GitHub Actions. Baixe RadarDOU.exe em Assets. Commit: $GITHUB_SHA." \
+            --latest

@@ -35,7 +35,7 @@ if not exist ".venv\Scripts\python.exe" (
   )
 )
 echo [2/3] Conferindo as bibliotecas necessarias...
-".venv\Scripts\python.exe" -c "import telegram, requests, bs4, playwright" >nul 2>nul
+".venv\Scripts\python.exe" -c "import telegram, requests, bs4, playwright, pystray" >nul 2>nul
 if errorlevel 1 (
   echo Bibliotecas ausentes: instalando (necessita internet)...
   ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt

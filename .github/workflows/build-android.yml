@@ -1,14 +1,6 @@
 name: Criar APK Android
 on:
   workflow_dispatch:
-  push:
-    branches: [main, master]
-    paths:
-      - 'main.py'
-      - 'android_service.py'
-      - 'radar_dou/**'
-      - 'buildozer.spec'
-      - '.github/workflows/build-android.yml'
 permissions:
   contents: read
 jobs:
@@ -16,20 +8,26 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
       - name: Testes de código antes do APK
         run: |
-          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
           python -m pytest -q
       - name: Compilar aplicativo Android (Kivy / Buildozer)
-        uses: ArtemSBulgakov/buildozer-action@v1
+        uses: ArtemSBulgakov/buildozer-action@3808a27e5d64e3921ed1735dacc214aeaec38080 # v1
         id: buildozer
         with:
           workdir: .
           buildozer_version: stable
           command: buildozer android debug
       - name: Disponibilizar o instalador
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: RadarDOU-Android-APK
           path: ${{ steps.buildozer.outputs.filename }}

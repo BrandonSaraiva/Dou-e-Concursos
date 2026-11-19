@@ -31,7 +31,6 @@ class PrivateFormatter(logging.Formatter):
 
 def run() -> None:
     root = setup_android_home(for_service=True)
-    config = load_settings()
     logger = logging.getLogger("radar_dou")
     logger.setLevel(logging.INFO)
     logger.propagate = False
@@ -39,7 +38,7 @@ def run() -> None:
         logger.removeHandler(old)
         old.close()
     file_handler = RotatingFileHandler(log_file(), encoding="utf-8", maxBytes=2_000_000, backupCount=3)
-    file_handler.setFormatter(PrivateFormatter(config.token if config else ""))
+    file_handler.setFormatter(PrivateFormatter(""))
     logger.addHandler(file_handler)
     for library in ("httpx", "httpcore", "telegram", "apscheduler"):
         logging.getLogger(library).setLevel(logging.WARNING)
@@ -53,10 +52,17 @@ def run() -> None:
         if not is_enabled(root):
             logger.info("Serviço iniciado, mas monitoramento está desativado.")
             return
+        try:
+            config = load_settings()
+        except ValueError:
+            logger.error("Configuração inválida; abra o aplicativo e salve seus dados.")
+            set_enabled(root, False)
+            return
         if not config:
             logger.error("Nenhuma configuração foi encontrada; abra o aplicativo e salve seus dados.")
             set_enabled(root, False)
             return
+        file_handler.setFormatter(PrivateFormatter(config.token))
         logger.info("Serviço Android em primeiro plano iniciado; notificação persistente ativa.")
         logger.info("Consultas móveis DOU/concursos por HTTP; Playwright indisponível no Android.")
         service = RadarService(config)
@@ -76,7 +82,7 @@ def run() -> None:
                 break
             time.sleep(1.5)
     except Exception as error:
-        logger.exception("Falha inesperada do serviço Android: %s", type(error).__name__)
+        logger.error("Falha inesperada do serviço Android: %s", type(error).__name__)
         set_enabled(root, False)
     finally:
         if service and service.busy:
