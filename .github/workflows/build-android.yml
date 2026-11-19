@@ -1,13 +1,13 @@
-name: Validar APK no Android 15
+name: Publicar APK Android 1.2.1 testado
 on:
   workflow_dispatch:
 permissions:
   actions: read
-  contents: read
+  contents: write
 jobs:
-  abrir-apk:
+  publicar:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -18,23 +18,15 @@ jobs:
           run-id: 44638341424
           name: RadarDOU-Android-APK
           path: bin
-      - name: Habilitar aceleração KVM
-        run: sudo chmod a+rw /dev/kvm
-      - name: Instalar, abrir e reabrir o APK
-        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          disk-size: 2G
-          emulator-boot-timeout: 240
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics -feature -Vulkan
-          script: bash scripts/test-android-apk.sh bin/RadarDOU.apk android-smoke
-      - name: Guardar captura da tela e logs do Android
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: RadarDOU-Android-teste-de-abertura
-          path: android-smoke/
-          if-no-files-found: ignore
+      - name: Publicar o instalador verificado
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          test "$(gh run view 44640789247 --json conclusion --jq .conclusion)" = success
+          printf '%s  RadarDOU.apk\n' 8eb92bfa5a139d6bd76e637c931cf486c5ed545dca33c5b69b5f746745db64fe > bin/SHA256SUMS-Android.txt
+          (cd bin && sha256sum --check SHA256SUMS-Android.txt)
+          gh release create android-v1.2.1 bin/RadarDOU.apk bin/SHA256SUMS-Android.txt \
+            --target 8ab4d2e4817667ebfd163bfff1610523dffca798 \
+            --title 'Radar DOU 1.2.1 para Android ARM64' \
+            --notes-file notas-android-1.2.1.md --latest=false
