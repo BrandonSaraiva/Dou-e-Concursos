@@ -1,114 +1,145 @@
-"""Regera ilustrações originais do README. Todos os tokens/IDs são fictícios."""
-from PIL import Image, ImageDraw, ImageFont
+"""Gera as ilustrações do guia sem capturas ou dados de contas reais."""
+
 from pathlib import Path
-import textwrap
 
-HERE=Path(__file__).resolve().parent
-W,H=1180,550
-COLORS={"bg":"#101725","panel":"#1c283d","panel2":"#24324b","text":"#f0f5ff","muted":"#b3c0d3","mint":"#45d6c9","blue":"#437bf4","pink":"#ff9aad","amber":"#f5cc87"}
-FONT="/usr/share/fonts/truetype/lato/Lato-Regular.ttf"
-BOLD="/usr/share/fonts/truetype/lato/Lato-Bold.ttf"
+from PIL import Image, ImageDraw, ImageFont
 
-def f(size,bold=False):return ImageFont.truetype(BOLD if bold else FONT,size)
 
-def base(title,subtitle):
-    image=Image.new("RGB",(W,H),COLORS["bg"]);d=ImageDraw.Draw(image)
-    d.rounded_rectangle((22,22,W-22,H-22),radius=24,outline="#31455f",width=2)
-    d.text((62,56),title,font=f(40,True),fill=COLORS["text"])
-    d.text((62,108),subtitle,font=f(23),fill=COLORS["muted"])
-    return image,d
+ASSETS = Path(__file__).resolve().parent
+WIDTH, HEIGHT = 1200, 610
+BACKGROUND = "#101725"
+PANEL = "#192335"
+CHIP = "#253650"
+BORDER = "#354a64"
+TEXT = "#edf4ff"
+MUTED = "#b6c7df"
+TEAL = "#66e1d3"
 
-def card(d,rect,title,sub,bg=None):
-    x1,y1,x2,y2=rect;d.rounded_rectangle(rect,radius=22,fill=bg or COLORS["panel"])
-    d.text((x1+20,y1+21),title,font=f(25,True),fill=COLORS["text"])
-    d.text((x1+20,y1+58),sub,font=f(19),fill=COLORS["muted"])
 
-def textlines(d,x,y,lines,size=22,step=34,color=None,bold=False):
-    for i,line in enumerate(lines):
-        d.text((x,y+step*i),line,font=f(size,bold),fill=color or COLORS["text"])
+def font(size, bold=False):
+    windows = "segoeuib.ttf" if bold else "segoeui.ttf"
+    try:
+        return ImageFont.truetype(windows, size)
+    except OSError:
+        linux = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+        return ImageFont.truetype(linux, size)
 
-def pill(d,box,text,fill=None,color=None,size=19):
-    d.rounded_rectangle(box,radius=15,fill=fill or COLORS["panel2"])
-    d.text((box[0]+15,box[1]+11),text,font=f(size,True),fill=color or COLORS["text"])
 
-def done(image,name): image.save(HERE/name,optimize=True)
+def label(draw, position, content, size, color=TEXT, bold=False):
+    draw.text(position, content, fill=color, font=font(size, bold), anchor="lt")
 
-im,d=base("1. Crie seu bot com o BotFather","Exemplo ilustrativo do processo oficial no Telegram")
-card(d,(60,171,535,467),"Conversa no Telegram","@BotFather • conta verificada")
-pill(d,(86,256,264,314),"/newbot",COLORS["blue"])
-pill(d,(86,328,490,388),"Meu Radar de Publicações",COLORS["panel2"])
-pill(d,(86,400,487,453),"meu_radar_dou_bot",COLORS["panel2"])
-card(d,(555,171,1120,467),"O que você precisa fazer","Siga as mensagens do BotFather")
-textlines(d,585,266,["1. Envie /newbot", "2. Escolha o nome do seu bot", "3. Crie um @usuario terminado em bot", "4. Copie o token para o Radar DOU"],23,40)
-pill(d,(570,476,1107,524),"TOKEN É SENHA: não compartilhe com ninguém",COLORS["panel2"],COLORS["pink"],18)
-done(im,"tutorial-botfather.png")
 
-im,d=base("2. Descubra seu ID no Telegram","O ID é um número de sua conta, diferente do token do bot")
-card(d,(60,175,556,482),"Conversa com @userinfobot","Abra, toque em Iniciar e veja o número")
-pill(d,(90,259,285,313),"/start",COLORS["blue"])
-pill(d,(90,331,495,400),"Id: 123456789   (EXEMPLO)",COLORS["panel2"],COLORS["mint"],24)
-card(d,(576,175,1120,482),"Preenchendo o aplicativo","Use o número da sua conta pessoal")
-textlines(d,605,258,["Campo: Seu ID numérico do Telegram", "Exemplo fictício: 123456789", "Não use seu @usuario ou telefone.", "Inicie também o SEU bot (/start)."],23,42)
-done(im,"tutorial-seu-id.png")
+def panel(draw, rect, fill=PANEL):
+    draw.rounded_rectangle(rect, radius=18, fill=fill, outline=BORDER, width=1)
 
-im,d=base("3. Gere o executável no GitHub","O projeto já inclui uma automação para criar o aplicativo Windows")
-for x,n,t,desc in [(55,"01","Novo repositório","Publicar como público"),(342,"02","Abra Actions","No repositório"),(629,"03","Executar workflow","Criar executável Windows"),(916,"04","Baixar ZIP","RadarDOU-Windows")]:
-    d.rounded_rectangle((x,196,x+252,468),radius=20,fill=COLORS["panel"])
-    d.ellipse((x+20,218,x+78,276),fill=COLORS["blue"])
-    d.text((x+32,233),n,font=f(21,True),fill="white")
-    d.text((x+18,299),t,font=f(23,True),fill=COLORS["text"])
-    for i,line in enumerate(textwrap.wrap(desc,width=19)):
-        d.text((x+18,351+i*28),line,font=f(19),fill=COLORS["muted"])
-    if x<916:
-        d.text((x+244,484),"›",font=f(42,True),fill=COLORS["mint"])
-done(im,"tutorial-github-actions.png")
 
-im,d=base("Como o Radar DOU funciona","Consultas verificadas, histórico persistente e alertas só de novidades")
-boxes=[(55,"1. BUSCA NO DOU",["Consulta pública","Contagem e metadados","Validação de páginas"]),
-       (438,"2. BASE LOCAL",["SQLite no computador","Referência da 1ª busca","URLs sem duplicatas"]),
-       (821,"3. TELEGRAM",["Avisa só novidades","Mensagens com link","Fila de reenvio"])]
-for x,t,ls in boxes:
-    d.rounded_rectangle((x,188,x+306,465),radius=24,fill=COLORS["panel"])
-    d.rounded_rectangle((x+16,207,x+290,260),radius=13,fill=COLORS["panel2"])
-    d.text((x+27,220),t,font=f(22,True),fill=COLORS["mint"])
-    textlines(d,x+23,310,ls,23,40)
-for x in (366,749):
-    d.text((x,290),"→",font=f(55,True),fill=COLORS["blue"])
-done(im,"fluxo.png")
+def canvas(kicker, title):
+    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
+    draw = ImageDraw.Draw(image)
+    label(draw, (48, 31), kicker, 24, TEAL, bold=True)
+    label(draw, (48, 65), title, 51, bold=True)
+    label(draw, (48, 565), "RADAR DOU + CONCURSOS   /   GUIA ILUSTRADO", 21, MUTED, bold=True)
+    return image, draw
 
-# Ilustração de referência, não captura de tela do APK compilado.
-im=Image.new("RGB",(1180,730),COLORS["bg"]); d=ImageDraw.Draw(im)
-d.text((50,41),"Radar DOU no Android",font=f(43,True),fill=COLORS["text"])
-d.text((50,101),"Exemplo ilustrativo de como a interface mobile será organizada",font=f(23),fill=COLORS["muted"])
-d.rounded_rectangle((62,169,502,700),radius=35,fill="#030c19",outline=COLORS["muted"],width=3)
-d.rounded_rectangle((79,190,485,681),radius=18,fill=COLORS["panel"])
-d.text((103,212),"RADAR DOU",font=f(30,True),fill=COLORS["mint"])
-d.text((103,251),"● Monitoramento ativo",font=f(19),fill=COLORS["mint"])
-for i,(caption,content) in enumerate([("NOME MONITORADO","Maria da Silva"),("SEU ID NO TELEGRAM","123456789"),("TOKEN DO BOT","•••••••••••••••••")]):
-    y=297+i*77
-    d.text((103,y),caption,font=f(17,True),fill=COLORS["muted"])
-    d.rounded_rectangle((101,y+27,457,y+66),radius=8,fill=COLORS["panel2"])
-    d.text((114,y+35),content,font=f(18),fill=COLORS["text"])
-d.rounded_rectangle((103,539,455,593),radius=12,fill=COLORS["blue"])
-d.text((148,554),"ATIVAR RADAR",font=f(23,True),fill=COLORS["text"])
-d.text((105,621),"Verificar agora   •   Desligar",font=f(18),fill=COLORS["muted"])
-card(d,(543,173,1122,355),"Monitoramento sem tela aberta","Serviço em primeiro plano no Android")
-textlines(d,571,276,["Notificação de serviço ativo", "Bot recebe comandos via Telegram"],22,39,color=COLORS["mint"])
-card(d,(543,375,1122,673),"O que aparece nos logs?","Mensagens guardadas no celular")
-textlines(d,569,479,["11:00  Conectando ao Telegram...", "11:00  Bot autenticado", "11:01  Consultando DOU...", "11:02  7 resultados, 0 novos", "12:02  Próxima consulta programada"],20,33,color=COLORS["mint"])
-done(im,"interface-android.png")
 
-im,d=base("4. Gerar o APK com GitHub Actions","Sem Android Studio ou ferramentas de programação no seu computador")
-steps=[("1", "Repositório", "Extraia o ZIP e envie os arquivos"),
-       ("2", "Actions", "Abra Criar APK Android"),
-       ("3", "Run workflow", "Execute a compilação"),
-       ("4", "Artifacts", "Baixe RadarDOU-Android-APK")]
-for i,(n,t,sub) in enumerate(steps):
-    x=50+i*286
-    d.rounded_rectangle((x,190,x+268,460),radius=20,fill=COLORS["panel"])
-    d.ellipse((x+24,212,x+82,270),fill=COLORS["blue"])
-    d.text((x+44,226),n,font=f(27,True),fill=COLORS["text"])
-    d.text((x+22,298),t,font=f(24,True),fill=COLORS["text"])
-    for j,line in enumerate(textwrap.wrap(sub,25)):
-        d.text((x+22,360+j*28),line,font=f(18),fill=COLORS["muted"])
-done(im,"tutorial-apk-github.png")
+def path(draw, x, y, steps):
+    for index, (content, width) in enumerate(steps):
+        panel(draw, (x, y, x + width, y + 56), CHIP)
+        label(draw, (x + 16, y + 15), content, 24, bold=True)
+        x += width + 14
+        if index < len(steps) - 1:
+            label(draw, (x, y + 13), "→", 27, TEAL)
+            x += 43
+
+
+def download():
+    image, draw = canvas("WINDOWS X64", "Baixe o Radar DOU no GitHub")
+    panel(draw, (48, 144, 1152, 335))
+    label(draw, (74, 166), "Versão publicada", 32, bold=True)
+    path(draw, 74, 219, [("Releases", 166), ("Assets", 140), ("RadarDOU.exe", 223)])
+    label(draw, (74, 290), "Baixe e abra o arquivo .exe.", 25, MUTED)
+    panel(draw, (48, 350, 1152, 542))
+    label(draw, (74, 372), "Prévia para teste", 32, bold=True)
+    path(draw, 74, 425, [
+        ("Actions", 115), ("Artifacts", 136), ("RadarDOU-Windows-x64", 320),
+        ("Extrair Tudo…", 198),
+    ])
+    label(draw, (74, 496), "Entre no GitHub para baixar o ZIP. Abra RadarDOU.exe na pasta extraída.", 25, MUTED)
+    image.save(ASSETS / "tutorial-download-windows.png", optimize=True)
+
+
+def botfather():
+    image, draw = canvas("TELEGRAM", "Crie seu bot com o BotFather")
+    panel(draw, (48, 144, 592, 448))
+    label(draw, (74, 170), "1   Abra o @BotFather", 32, bold=True)
+    label(draw, (74, 221), "Confira o selo da conta oficial.", 26, MUTED)
+    path(draw, 74, 267, [("Iniciar", 124), ("/newbot", 151)])
+    label(draw, (74, 347), "Escolha um nome para o bot.", 26)
+    label(draw, (74, 388), "O nome de usuário termina em bot.", 26)
+
+    panel(draw, (608, 144, 1152, 448))
+    label(draw, (635, 170), "2   Copie o token recebido", 32, bold=True)
+    label(draw, (635, 221), "Copie a sequência completa.", 26, MUTED)
+    panel(draw, (634, 267, 1125, 323), CHIP)
+    label(draw, (656, 283), "••••••••••••••••••••", 24, TEAL, bold=True)
+    label(draw, (635, 347), "Cole no Radar DOU, no campo", 26)
+    label(draw, (635, 388), "Token do seu bot (BotFather).", 26, bold=True)
+
+    panel(draw, (48, 463, 1152, 542))
+    label(draw, (74, 486), "3   Abra o bot que você criou e toque em Iniciar ou envie /start.", 27, TEAL, bold=True)
+    image.save(ASSETS / "tutorial-botfather.png", optimize=True)
+
+
+def telegram_id():
+    image, draw = canvas("TELEGRAM", "Encontre o ID da sua conta")
+    panel(draw, (48, 144, 592, 542))
+    label(draw, (74, 170), "1   Abra @userinfobot", 32, bold=True)
+    label(draw, (74, 226), "Toque em Iniciar para ver seu ID.", 26, MUTED)
+    panel(draw, (74, 286, 564, 362), CHIP)
+    label(draw, (96, 308), "Id   123456789", 30, TEAL, bold=True)
+    label(draw, (74, 396), "Copie apenas os dígitos.", 26)
+    label(draw, (74, 442), "O número acima é fictício.", 26, MUTED)
+
+    panel(draw, (608, 144, 1152, 542))
+    label(draw, (635, 170), "2   Preencha no Radar DOU", 32, bold=True)
+    label(draw, (635, 226), "Seu ID numérico do Telegram", 26, MUTED)
+    panel(draw, (634, 286, 1125, 362), CHIP)
+    label(draw, (656, 308), "123456789", 30, bold=True)
+    label(draw, (635, 396), "Use o ID da sua conta pessoal.", 26)
+    label(draw, (635, 442), "Digite o token no campo seguinte.", 26, MUTED)
+    image.save(ASSETS / "tutorial-seu-id.png", optimize=True)
+
+
+def windows_interface():
+    image, draw = canvas("WINDOWS X64  /  MAPA DA INTERFACE", "Configure e ative o Radar")
+    panel(draw, (48, 144, 592, 542))
+    label(draw, (74, 168), "Configurar monitoramento", 32, bold=True)
+    for y, field in [
+        (222, "Nome ou expressão para acompanhar"),
+        (258, "Seu ID numérico do Telegram"),
+        (294, "Token do seu bot (BotFather)"),
+        (330, "Intervalo entre consultas"),
+        (366, "UF para os concursos estaduais"),
+    ]:
+        label(draw, (74, y), field, 25, MUTED)
+    label(draw, (74, 421), "Role o painel até o fim se precisar.", 24, TEAL)
+    label(draw, (74, 463), "Salvar configurações", 26, bold=True)
+    label(draw, (74, 502), "Testar conexão com Telegram", 26, bold=True)
+
+    panel(draw, (608, 144, 1152, 542))
+    label(draw, (634, 168), "Central de monitoramento", 32, bold=True)
+    label(draw, (634, 222), "Resultados DOU • Concursos abertos", 25, MUTED)
+    panel(draw, (634, 273, 1125, 327), CHIP)
+    label(draw, (656, 288), "Ativar radar", 28, TEAL, bold=True)
+    label(draw, (634, 358), "Desligar  ·  Conferir agora", 26)
+    label(draw, (634, 423), "Registro de atividades", 26, bold=True)
+    label(draw, (634, 465), "Acompanhe o estado das consultas", 25, MUTED)
+    label(draw, (634, 499), "e a entrega dos alertas.", 25, MUTED)
+    image.save(ASSETS / "mapa-interface-windows.png", optimize=True)
+
+
+if __name__ == "__main__":
+    download()
+    botfather()
+    telegram_id()
+    windows_interface()
