@@ -87,8 +87,8 @@ class RadarAndroid(App):
 
         body.add_widget(label("[b]01  Configuração[/b]", 39, WHITE, 19))
         body.add_widget(label("Nome ou expressão que o DOU deve acompanhar", 28, WHITE, 14))
-        self.name = self._input("Ex.: Maria da Silva")
-        body.add_widget(self.name)
+        self.monitored_name = self._input("Ex.: Maria da Silva")
+        body.add_widget(self.monitored_name)
         body.add_widget(label("Seu ID numérico no Telegram", 28, WHITE, 14))
         self.chat = self._input("Ex.: 123456789", numeric=True)
         body.add_widget(self.chat)
@@ -175,7 +175,7 @@ class RadarAndroid(App):
             state = self.uf.text.strip().upper()
             if state == "SOMENTE NACIONAL":
                 state = ""
-            return AppConfig(self.name.text, int(self.chat.text.strip()), self.token.text.strip(),
+            return AppConfig(self.monitored_name.text, int(self.chat.text.strip()), self.token.text.strip(),
                              int(self.interval.text.split()[0]), uf=state,
                              monitor_dou=bool(self.dou_enabled.active),
                              monitor_concursos=bool(self.contests_enabled.active)).validated()
@@ -190,7 +190,7 @@ class RadarAndroid(App):
         try:
             config = load_settings()
             if config:
-                self.name.text = config.name
+                self.monitored_name.text = config.name
                 self.chat.text = str(config.telegram_id)
                 self.token.text = config.token
                 self.interval.text = f"{config.interval_minutes} minutos"
@@ -269,7 +269,7 @@ class RadarAndroid(App):
 
     def _open_dou(self):
         try:
-            url = SEARCH_ENDPOINT + "?" + urlencode(search_parameters(self.name.text))
+            url = SEARCH_ENDPOINT + "?" + urlencode(search_parameters(self.monitored_name.text))
         except ValueError:
             url = SEARCH_ENDPOINT
         webbrowser.open(url)

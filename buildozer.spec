@@ -5,7 +5,7 @@ package.domain = org.radardou
 source.dir = .
 source.include_exts = py,kv,png,jpg,atlas,md
 source.exclude_dirs = .git,.github,.venv,tests,assets,__pycache__,.pytest_cache,dist,build,bin
-version = 1.2.0
+version = 1.2.1
 requirements = python3,kivy==2.3.1,pyjnius,requests,beautifulsoup4,python-telegram-bot,apscheduler
 orientation = portrait
 fullscreen = 0
