@@ -49,3 +49,41 @@ jobs:
           path: bin/RadarDOU.apk
           if-no-files-found: error
           retention-days: 30
+
+  iniciar-apk:
+    name: Abrir o APK ARM64 no Android
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: RadarDOU-Android-APK
+          path: bin
+      - name: Preparar emulador Android com tradução ARM64
+        run: |
+          sudo chmod a+rw /dev/kvm
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          image='system-images;android-30;google_apis;x86_64'
+          "$sdkmanager" --install emulator platform-tools "$image"
+          "$avdmanager" create avd --name radar-dou --package "$image" --device pixel_2 <<< no
+      - name: Instalar, abrir e reabrir o APK
+        run: |
+          mkdir -p android-smoke
+          "$ANDROID_HOME/emulator/emulator" -avd radar-dou -accel on -no-window \
+            -no-audio -no-boot-anim -no-snapshot -camera-back none -camera-front none \
+            -gpu swiftshader_indirect > android-smoke/emulator.log 2>&1 &
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          timeout 10m bash scripts/test-android-apk.sh bin/RadarDOU.apk android-smoke
+      - name: Guardar captura da tela e logs do Android
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: RadarDOU-Android-teste-de-abertura
+          path: android-smoke/
+          if-no-files-found: ignore
+          retention-days: 30
