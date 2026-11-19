@@ -6,7 +6,7 @@ source.dir = .
 source.include_exts = py,kv,png,jpg,atlas,md
 source.exclude_dirs = .git,.github,.venv,tests,assets,__pycache__,.pytest_cache,dist,build,bin
 version = 1.2.0
-requirements = python3,kivy==2.3.1,pyjnius,requests,beautifulsoup4,python-telegram-bot==22.5,apscheduler==3.10.4
+requirements = python3,kivy==2.3.1,pyjnius,requests,beautifulsoup4,python-telegram-bot,apscheduler
 orientation = portrait
 fullscreen = 0
 android.archs = arm64-v8a
