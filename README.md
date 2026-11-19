@@ -2,7 +2,7 @@
 
 Acompanhe um nome no Diário Oficial da União e concursos nacionais ou da sua UF. O Radar guarda o histórico no dispositivo e avisa pelo Telegram quando encontra novidades.
 
-**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · [Guia Windows](docs/GUIA_WINDOWS.md) · [Guia Android](ANDROID.md) · [Capturas do Telegram](https://github.com/BrandonSaraiva/Dou-e-Concursos/blob/main/docs/DEMONSTRACAO.md)
+**[Baixar para Windows](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/latest)** · **[Baixar APK para Android](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.0/RadarDOU.apk)** · [Guia Windows](docs/GUIA_WINDOWS.md) · [Guia Android](ANDROID.md) · [Capturas do Telegram](https://github.com/BrandonSaraiva/Dou-e-Concursos/blob/main/docs/DEMONSTRACAO.md)
 
 ![Diagrama do download Windows pelo GitHub Releases e da versão de teste pelo GitHub Actions](assets/tutorial-download-windows.png)
 
@@ -16,7 +16,7 @@ O [guia Windows](docs/GUIA_WINDOWS.md) mostra como criar o bot, localizar seu ID
 
 ## Comece pelo Android
 
-Consulte o [guia Android](ANDROID.md) para acompanhar a publicação do APK, configurar o bot e testar os alertas.
+Baixe **RadarDOU.apk** pelo link acima, abra o arquivo em **Downloads** e siga o [guia Android](ANDROID.md) para configurar o bot e testar os alertas.
 
 ## O que o Radar acompanha
 

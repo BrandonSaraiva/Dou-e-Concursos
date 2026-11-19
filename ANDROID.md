@@ -1,10 +1,10 @@
 # Radar DOU no Android
 
-O instalador Android está em compilação. [Acompanhar no GitHub Actions](https://github.com/BrandonSaraiva/Dou-e-Concursos/actions/workflows/build-android.yml)
+**[Baixar RadarDOU.apk](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.0/RadarDOU.apk)** · [Página da versão](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/tag/android-v1.2.0)
 
 ## Baixe e instale
 
-1. Quando **RadarDOU.apk** aparecer em [Releases](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases), baixe o arquivo no celular. O pacote é para Android 8.0 ou superior em aparelhos ARM64.
+1. Abra o link acima no celular e baixe **RadarDOU.apk**. O pacote é para Android 8.0 ou superior em aparelhos ARM64.
 2. Abra o APK em **Downloads**. Se o Android pedir autorização para instalar apps dessa origem, confirme que o arquivo veio deste GitHub antes de autorizar.
 3. Abra **Radar DOU** e permita as notificações quando solicitado. A notificação do monitoramento aparece depois que você ativa o Radar.
 4. Siga os passos para [criar o bot](docs/GUIA_WINDOWS.md#2-crie-seu-bot-no-telegram) e [descobrir seu ID](docs/GUIA_WINDOWS.md#3-descubra-seu-id-numérico). Envie `/start` no chat do seu próprio bot antes de testar o envio.
