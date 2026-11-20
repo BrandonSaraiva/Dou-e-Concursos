@@ -53,6 +53,6 @@ A [demonstração com capturas reais](docs/DEMONSTRACAO.md) mostra o menu, o sta
 
 ![Menu real do Radar no Telegram com o nome monitorado ocultado](assets/telegram-real/menu.png)
 
-Para relatar um problema, abra uma [Issue](https://github.com/BrandonSaraiva/Dou-e-Concursos/issues) e omita tokens, IDs e dados monitorados.
+Ao compartilhar capturas do Radar, oculte tokens, IDs e dados monitorados.
 
 Projeto distribuído sob a [licença MIT](LICENSE).
