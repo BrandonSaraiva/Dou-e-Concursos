@@ -43,6 +43,8 @@ class UndoableEntry(tk.Entry):
         self._edit_job = None
         self.reset_history()
         self._trace = textvariable.trace_add("write", self._schedule_edit)
+        for event in ("<KeyPress>", "<<Paste>>", "<<Cut>>", "<<Clear>>", "<<PasteSelection>>"):
+            self.bind(event, self._remember_cursor)
         for event in ("<Control-z>", "<<Undo>>"):
             self.bind(event, lambda _: self._restore_edit(self._undo, self._redo))
         for event in ("<Control-y>", "<Control-Shift-Z>", "<<Redo>>"):
@@ -70,10 +72,17 @@ class UndoableEntry(tk.Entry):
             self._redo.clear()
             self._snapshot = value, self.index(tk.INSERT)
 
-    def _restore_edit(self, history, reverse):
+    def _flush_edit(self):
         if self._edit_job is not None:
             self.after_cancel(self._edit_job)
             self._record_edit()
+
+    def _remember_cursor(self, _):
+        self._flush_edit()
+        self._snapshot = self.get(), self.index(tk.INSERT)
+
+    def _restore_edit(self, history, reverse):
+        self._flush_edit()
         if history:
             reverse.append((self.get(), self.index(tk.INSERT)))
             self._snapshot = history.pop()
@@ -687,6 +696,38 @@ class RadarApp(tk.Tk):
                 duplicate.request_window()
             wait_for(self.winfo_viewable, self.destroy)
 
+        def exercise_clipboard():
+            entry = self._token_entry
+            original = "token-anterior"
+            pasted = "token-colado"
+            entry.delete(0, tk.END)
+            entry.insert(0, original)
+            entry.reset_history()
+            entry.icursor(tk.END)
+            if sys.platform == "win32":
+                entry.selection_range(0, tk.END)
+                expected = pasted
+            else:
+                expected = original + pasted
+            try:
+                previous = self.clipboard_get()
+            except tk.TclError:
+                previous = None
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(pasted)
+                entry.event_generate("<Control-v>")
+                self.update_idletasks()
+                if entry.get() != expected or not entry.cget("show"):
+                    raise RuntimeError("A colagem no token mascarado falhou")
+                entry.event_generate("<Control-z>")
+                if entry.get() != original or entry.index(tk.INSERT) != len(original):
+                    raise RuntimeError("Ctrl+Z não restaurou o token depois da colagem")
+            finally:
+                self.clipboard_clear()
+                if previous is not None:
+                    self.clipboard_append(previous)
+
         def exercise_window():
             for entry in self._config_entries:
                 entry.focus_force()
@@ -694,17 +735,20 @@ class RadarApp(tk.Tk):
                 entry.insert(0, "12")
                 entry.reset_history()
                 entry.selection_range(0, tk.END)
+                entry.icursor(1)
                 self.update()
                 entry.event_generate("<KeyPress-3>")
                 self.update_idletasks()
                 if entry.get() != "3":
                     raise RuntimeError("A digitação não substituiu a seleção")
                 entry.event_generate("<Control-z>")
-                if entry.get() != "12":
+                if entry.get() != "12" or entry.index(tk.INSERT) != 1:
                     raise RuntimeError("Ctrl+Z não desfez a edição do campo")
                 entry.event_generate("<Control-y>")
                 if entry.get() != "3":
                     raise RuntimeError("Ctrl+Y não refez a edição do campo")
+            if os.environ.get("RADAR_DOU_SELF_TEST") == "1":
+                exercise_clipboard()
             if self._instance is None:
                 self.destroy()
             else:

@@ -47,7 +47,7 @@ Cole o token apenas no Radar. Se ele for exposto, revogue-o no BotFather, gere o
 
 ![Mapa ilustrado dos campos de configuração e dos botões da central Windows](../assets/mapa-interface-windows.png)
 
-1. Em **Seu ID numérico do Telegram**, cole o número do passo anterior. Em **Token do seu bot (BotFather)**, cole o token completo.
+1. Em **Seu ID numérico do Telegram**, cole o número do passo anterior. Em **Token do seu bot (BotFather)**, cole o token completo. Nos campos de texto, use **Ctrl+Z** para desfazer e **Ctrl+Y** para refazer.
 2. Marque pelo menos um monitor. Para pesquisar no DOU, marque **Monitorar nome no DOU** e preencha **Nome ou expressão para acompanhar**. Em **Intervalo entre consultas**, escolha a frequência do DOU.
 3. Para acompanhar concursos, marque **Monitorar concursos abertos**. Em **UF para os concursos estaduais**, escolha uma sigla, como **DF**, ou deixe **Somente nacional**. A consulta nacional está incluída e concursos são conferidos a cada hora.
 4. Se os botões estiverem fora da área visível, use a barra de rolagem do painel esquerdo. Clique em **Salvar configurações** e em **Testar conexão com Telegram**. Confirme se a mensagem de teste chegou no chat do seu bot.
