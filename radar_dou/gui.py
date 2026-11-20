@@ -1,5 +1,6 @@
 """Interface gráfica Tkinter: funciona sem terminal, VS Code ou edição de .env."""
 from __future__ import annotations
+from collections import deque
 import logging
 from logging.handlers import RotatingFileHandler
 from contextlib import nullcontext
@@ -29,6 +30,63 @@ CYAN = "#38d5ca"
 BLUE = "#4078f5"
 RED = "#fc878e"
 YELLOW = "#ffd08b"
+
+
+class UndoableEntry(tk.Entry):
+    """Adiciona histórico local aos campos de texto do Tk."""
+
+    def __init__(self, master, *, textvariable, **options):
+        super().__init__(master, textvariable=textvariable, **options)
+        self._variable = textvariable
+        self._undo = deque(maxlen=100)
+        self._redo = deque(maxlen=100)
+        self._edit_job = None
+        self.reset_history()
+        self._trace = textvariable.trace_add("write", self._schedule_edit)
+        for event in ("<Control-z>", "<<Undo>>"):
+            self.bind(event, lambda _: self._restore_edit(self._undo, self._redo))
+        for event in ("<Control-y>", "<Control-Shift-Z>", "<<Redo>>"):
+            self.bind(event, lambda _: self._restore_edit(self._redo, self._undo))
+        self.bind("<Destroy>", self._remove_trace)
+
+    def reset_history(self):
+        if self._edit_job is not None:
+            self.after_cancel(self._edit_job)
+            self._edit_job = None
+        self._undo.clear()
+        self._redo.clear()
+        self._snapshot = self.get(), self.index(tk.INSERT)
+
+    def _schedule_edit(self, *_):
+        if self._edit_job is None and self._variable.get() != self._snapshot[0]:
+            # Um único gesto pode apagar a seleção e inserir outro texto.
+            self._edit_job = self.after_idle(self._record_edit)
+
+    def _record_edit(self):
+        self._edit_job = None
+        value = self.get()
+        if value != self._snapshot[0]:
+            self._undo.append(self._snapshot)
+            self._redo.clear()
+            self._snapshot = value, self.index(tk.INSERT)
+
+    def _restore_edit(self, history, reverse):
+        if self._edit_job is not None:
+            self.after_cancel(self._edit_job)
+            self._record_edit()
+        if history:
+            reverse.append((self.get(), self.index(tk.INSERT)))
+            self._snapshot = history.pop()
+            value, cursor = self._snapshot
+            self._variable.set(value)
+            self.selection_clear()
+            self.icursor(cursor)
+        return "break"
+
+    def _remove_trace(self, _):
+        if self._edit_job is not None:
+            self.after_cancel(self._edit_job)
+        self._variable.trace_remove("write", self._trace)
 
 
 class SafeLogFormatter(logging.Formatter):
@@ -102,6 +160,8 @@ class RadarApp(tk.Tk):
         self._build()
         self._setup_logging()
         config = self._load_persisted()
+        for entry in self._config_entries:
+            entry.reset_history()
         self._load_previous_logs()
         if background and (not config or not config.start_with_windows):
             self.destroy()
@@ -198,11 +258,11 @@ class RadarApp(tk.Tk):
                  pady=4).pack(anchor="w")
         line = tk.Frame(parent, bg=PANEL)
         line.pack(fill="x")
-        entry = tk.Entry(line, textvariable=var, bg=BG, fg=TEXT, relief="flat",
-                         insertbackground=CYAN, font=("Segoe UI", 11),
-                         highlightbackground=BORDER, highlightthickness=1,
-                         highlightcolor=CYAN, borderwidth=0,
-                         show="•" if secret else "")
+        entry = UndoableEntry(line, textvariable=var, bg=BG, fg=TEXT, relief="flat",
+                              insertbackground=CYAN, font=("Segoe UI", 11),
+                              highlightbackground=BORDER, highlightthickness=1,
+                              highlightcolor=CYAN, borderwidth=0,
+                              show="•" if secret else "")
         entry.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 7) if secret else 0)
         if secret:
             tk.Button(line, text="Mostrar", command=self._toggle_secret, bg=CARD,
@@ -225,12 +285,13 @@ class RadarApp(tk.Tk):
     def _left(self, parent):
         self._section(parent, "01  Configurar monitoramento",
                       "Preencha uma vez. As informações serão lembradas nas próximas vezes.")
-        self._field(parent, "Nome ou expressão para acompanhar", self.name_var,
-                    "A busca replica a expressão exata do DOU.")
-        self._field(parent, "Seu ID numérico do Telegram", self.chat_var,
-                    "É o ID da sua conta, não o número de telefone. Veja @userinfobot.")
+        name_entry = self._field(parent, "Nome ou expressão para acompanhar", self.name_var,
+                                 "A busca replica a expressão exata do DOU.")
+        chat_entry = self._field(parent, "Seu ID numérico do Telegram", self.chat_var,
+                                 "É o ID da sua conta, não o número de telefone. Veja @userinfobot.")
         self._field(parent, "Token do seu bot (BotFather)", self.token_var,
                     "O token inclui números, dois-pontos e letras. Ele não é apenas o ID do bot.", secret=True)
+        self._config_entries = name_entry, chat_entry, self._token_entry
         tk.Label(parent, text="Intervalo entre consultas", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 10, "bold"), pady=4).pack(anchor="w")
         items = ttk.Combobox(parent, style="Radar.TCombobox", values=("15", "30", "60", "120", "360", "720", "1440"),
@@ -603,7 +664,7 @@ class RadarApp(tk.Tk):
             self.destroy()
 
     def smoke_gui(self):
-        """Verifica janela real, fechamento para a bandeja e reabertura."""
+        """Verifica edição na janela real, fechamento para a bandeja e reabertura."""
         deadline = time.monotonic() + 15
 
         def wait_for(ready, action):
@@ -626,9 +687,32 @@ class RadarApp(tk.Tk):
                 duplicate.request_window()
             wait_for(self.winfo_viewable, self.destroy)
 
+        def exercise_window():
+            for entry in self._config_entries:
+                entry.focus_force()
+                entry.delete(0, tk.END)
+                entry.insert(0, "12")
+                entry.reset_history()
+                entry.selection_range(0, tk.END)
+                self.update()
+                entry.event_generate("<KeyPress-3>")
+                self.update_idletasks()
+                if entry.get() != "3":
+                    raise RuntimeError("A digitação não substituiu a seleção")
+                entry.event_generate("<Control-z>")
+                if entry.get() != "12":
+                    raise RuntimeError("Ctrl+Z não desfez a edição do campo")
+                entry.event_generate("<Control-y>")
+                if entry.get() != "3":
+                    raise RuntimeError("Ctrl+Y não refez a edição do campo")
+            if self._instance is None:
+                self.destroy()
+            else:
+                exercise_tray()
+
         wait_for(lambda: self.winfo_viewable()
                  and (self._instance is None or self._tray_ready),
-                 self.destroy if self._instance is None else exercise_tray)
+                 exercise_window)
 
 
 def main(*, background=False, smoke=False):

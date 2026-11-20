@@ -33,7 +33,7 @@ try {
     Invoke-SmokeCase '--self-test' 'Imports empacotados, driver Playwright, DPAPI, configuração e escrita no SQLite'
     Invoke-SmokeCase '--self-test-read' 'Reabertura em outro processo e leitura da configuração e histórico'
     $env:RADAR_DOU_HOME = Join-Path $testRoot 'ui'
-    Invoke-SmokeCase '--smoke-gui' 'Abertura e encerramento da interface'
+    Invoke-SmokeCase '--smoke-gui' 'Abertura, edição dos campos e encerramento da interface'
 } finally {
     $env:PATH = $oldPath
     $env:RADAR_DOU_HOME = $oldHome
