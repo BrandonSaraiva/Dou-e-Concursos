@@ -1,10 +1,10 @@
 # Radar DOU no Android
 
-**[Baixar RadarDOU.apk](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.1/RadarDOU.apk)** · [Página da versão](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/tag/android-v1.2.1)
+**[Baixar RadarDOU.apk](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/download/android-v1.2.2/RadarDOU.apk)** · [Página da versão](https://github.com/BrandonSaraiva/Dou-e-Concursos/releases/tag/android-v1.2.2)
 
 ## Baixe e instale
 
-Se o Radar DOU 1.2.0 estiver instalado, desinstale essa versão antes de instalar a 1.2.1. A assinatura do APK mudou. A desinstalação apaga os dados locais, então tenha em mãos os dados do seu bot para configurar o Radar novamente.
+Se você instalou o Radar DOU 1.2.0 ou 1.2.1, desinstale a versão anterior antes de instalar a 1.2.2. A assinatura do APK mudou. A desinstalação apaga os dados locais, então tenha em mãos os dados do seu bot para configurar o Radar novamente.
 
 1. Abra o link acima no celular e baixe **RadarDOU.apk**. O pacote é para Android 8.0 ou superior em aparelhos ARM64.
 2. Abra o APK em **Downloads**. Se o Android pedir autorização para instalar apps dessa origem, confirme que o arquivo veio deste GitHub antes de autorizar.
@@ -13,7 +13,7 @@ Se o Radar DOU 1.2.0 estiver instalado, desinstale essa versão antes de instala
 
 ## Configure e teste os alertas
 
-1. Em **Seu ID numérico no Telegram**, digite o número da sua conta. Em **Token do bot fornecido pelo @BotFather**, cole o token completo.
+1. No Telegram, copie o ID numérico da sua conta e toque em **Colar** ao lado do campo de ID no Radar. Depois, copie o token completo do BotFather e toque em **Colar token**. O campo mascara o token por padrão.
 2. Marque **Diário Oficial da União** se quiser acompanhar um nome e preencha **Nome ou expressão que o DOU deve acompanhar**. **Intervalo entre consultas** controla essa pesquisa.
 3. Marque **Concursos públicos abertos** se quiser acompanhar concursos. Em **UF dos concursos (além dos nacionais)**, escolha uma UF ou deixe **Somente nacional**. O Radar consulta concursos a cada 60 minutos.
 4. Toque em **SALVAR CONFIGURAÇÕES** e em **TESTAR ENVIO PARA O TELEGRAM**. Confirme que recebeu a mensagem no chat do seu bot.
